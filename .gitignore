@@ -1,1 +1,64 @@
 /.metadata/
+
+##############################
+# OS Files
+##############################
+
+.DS_Store
+Thumbs.db
+
+##############################
+# IDE
+##############################
+
+.idea/
+.vscode/
+*.iml
+.settings/
+.project
+.classpath
+.factorypath
+
+##############################
+# Logs
+##############################
+
+*.log
+
+##############################
+# Spring Boot
+##############################
+
+backend/target/
+backend/.mvn/wrapper/maven-wrapper.jar
+
+##############################
+# Local Configuration (DO NOT PUSH)
+##############################
+
+backend/src/main/resources/application-local.properties
+backend/src/main/resources/application-dev.properties
+backend/src/main/resources/application-prod.properties
+
+##############################
+# React (Vite)
+##############################
+
+frontend/node_modules/
+frontend/dist/
+
+##############################
+# Environment Files
+##############################
+
+frontend/.env
+frontend/.env.local
+frontend/.env.development
+frontend/.env.production
+
+##############################
+# Misc
+##############################
+
+*.swp
+*.swo
