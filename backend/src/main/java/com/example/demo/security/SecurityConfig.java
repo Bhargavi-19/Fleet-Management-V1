@@ -34,6 +34,9 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/customer/register",
                                 "/api/customer/login",
+                                "/api/car-types/{hubId}",
+                                "/api/hubs",
+                                "/api/hubs/{hubId}",                                
                                 "/health")
                         .permitAll()
 

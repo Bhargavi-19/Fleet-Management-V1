@@ -9,6 +9,17 @@ import com.example.demo.response.ApiResponse;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+	
+	@ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ApiResponse<Object>> handleResourceNotFound(ResourceNotFoundException ex) {
+
+        ApiResponse<Object> response = new ApiResponse<>();
+        response.setSuccess(false);
+        response.setMessage(ex.getMessage());
+        response.setData(null);
+
+        return new ResponseEntity<>(response, HttpStatus.NOT_FOUND);
+    }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Object>> handleException(Exception ex) {
