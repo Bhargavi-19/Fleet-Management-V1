@@ -1,1 +1,12 @@
-/.metadata/
+# Eclipse
+.metadata/
+.project
+.classpath
+.settings/
+
+# Java
+bin/
+target/
+
+# STS
+.springBeans
