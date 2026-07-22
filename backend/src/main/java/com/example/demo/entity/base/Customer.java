@@ -11,11 +11,22 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
 
 @Entity
 @Table(name = "customer")
 public class Customer extends BaseEntity {
+	
+	/*
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@Column(name = "id")
+	private Integer id;
+	 */
 
+	@Id
     @Column(name = "customer_id", unique = true)
     private String customerId;
 
