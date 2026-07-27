@@ -24,7 +24,7 @@ public class Customer extends BaseEntity {
     @Column(nullable = false, unique = true, length = 15)
     private String phone;
 
-    @Column(name = "password_hash", nullable = false)
+    @Column(name = "password_hash")
     private String passwordHash;
 
     @Column(name = "driving_license_no")
@@ -59,6 +59,7 @@ public class Customer extends BaseEntity {
 
     @Column(name = "file_url")
     private String fileUrl;
+    
 
 
 	public Customer() {
@@ -215,5 +216,7 @@ public class Customer extends BaseEntity {
 	public void setFileUrl(String fileUrl) {
 		this.fileUrl = fileUrl;
 	}
-    
+
+    // Generate Getters and Setters
 }
+    
