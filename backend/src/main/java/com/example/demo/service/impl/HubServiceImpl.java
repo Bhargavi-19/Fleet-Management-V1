@@ -33,7 +33,7 @@ public class HubServiceImpl implements HubService {
     @Override
     public List<HubResponse> getAllHubs(Integer stateId, Integer cityId) {
 
-        List<Hub> hubs = repository.findByStateIdAndCityId(stateId, cityId);
+        List<Hub> hubs = repository.findByState_StateIdAndCity_CityId(stateId, cityId);
 
         if (hubs.isEmpty()) {
             throw new ResourceNotFoundException(
