@@ -1,5 +1,6 @@
 package com.example.demo.service.impl;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +22,8 @@ import com.example.demo.repository.CustomerRepository;
 import com.example.demo.response.ApiResponse;
 import com.example.demo.security.JwtService;
 import com.example.demo.service.CustomerService;
+
+import jakarta.transaction.Transactional;
 
 @Service
 public class CustomerServiceImpl implements CustomerService {
@@ -212,5 +215,4 @@ public class CustomerServiceImpl implements CustomerService {
                 "Password changed successfully",
                 null);
     }
-    
 }
