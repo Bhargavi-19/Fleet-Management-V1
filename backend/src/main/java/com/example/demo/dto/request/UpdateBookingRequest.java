@@ -1,19 +1,10 @@
-package com.example.demo.dto.response;
+package com.example.demo.dto.request;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.math.BigDecimal;
+import java.util.List;
 
-import com.example.demo.enums.BookingStatus;
-
-public class BookingResponse {
-
-    private Long bookingId;
-    private String customerId;
-
-    private String customerName;
-    private String email;
-
-    private Long carId;
+public class UpdateBookingRequest {
 
     private LocalDate startDate;
     private LocalDate endDate;
@@ -22,23 +13,7 @@ public class BookingResponse {
     private String pickupHubName;
 
     private Integer dropoffHubId;
-    public Integer getPickupHubId() {
-		return pickupHubId;
-	}
-
-	public void setPickupHubId(Integer pickupHubId) {
-		this.pickupHubId = pickupHubId;
-	}
-
-	public Integer getDropoffHubId() {
-		return dropoffHubId;
-	}
-
-	public void setDropoffHubId(Integer dropoffHubId) {
-		this.dropoffHubId = dropoffHubId;
-	}
-
-	private String dropoffHubName;
+    private String dropoffHubName;
 
     private Integer duration;
 
@@ -47,49 +22,9 @@ public class BookingResponse {
     private BigDecimal taxAmount;
     private BigDecimal grandTotal;
 
-    private BookingStatus bookingStatus;
+    private List<AddonRequest> addons;
 
-    public BookingResponse() {
-    }
-
-    public Long getBookingId() {
-        return bookingId;
-    }
-
-    public void setBookingId(Long bookingId) {
-        this.bookingId = bookingId;
-    }
-
-    public String getCustomerId() {
-        return customerId;
-    }
-
-    public void setCustomerId(String customerId) {
-        this.customerId = customerId;
-    }
-
-    public String getCustomerName() {
-        return customerName;
-    }
-
-    public void setCustomerName(String customerName) {
-        this.customerName = customerName;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public Long getCarId() {
-        return carId;
-    }
-
-    public void setCarId(Long carId) {
-        this.carId = carId;
+    public UpdateBookingRequest() {
     }
 
     public LocalDate getStartDate() {
@@ -108,12 +43,28 @@ public class BookingResponse {
         this.endDate = endDate;
     }
 
+    public Integer getPickupHubId() {
+        return pickupHubId;
+    }
+
+    public void setPickupHubId(Integer pickupHubId) {
+        this.pickupHubId = pickupHubId;
+    }
+
     public String getPickupHubName() {
         return pickupHubName;
     }
 
     public void setPickupHubName(String pickupHubName) {
         this.pickupHubName = pickupHubName;
+    }
+
+    public Integer getDropoffHubId() {
+        return dropoffHubId;
+    }
+
+    public void setDropoffHubId(Integer dropoffHubId) {
+        this.dropoffHubId = dropoffHubId;
     }
 
     public String getDropoffHubName() {
@@ -164,11 +115,11 @@ public class BookingResponse {
         this.grandTotal = grandTotal;
     }
 
-    public BookingStatus getBookingStatus() {
-        return bookingStatus;
+    public List<AddonRequest> getAddons() {
+        return addons;
     }
 
-    public void setBookingStatus(BookingStatus bookingStatus) {
-        this.bookingStatus = bookingStatus;
+    public void setAddons(List<AddonRequest> addons) {
+        this.addons = addons;
     }
 }
