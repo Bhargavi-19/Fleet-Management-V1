@@ -12,10 +12,16 @@ public class BookingRequest {
     private LocalDate startDate;
     private LocalDate endDate;
 
+    private Integer pickupHubId;
     private String pickupHubName;
-    private String dropoffHubName;
 
-    private BigDecimal dailyRate;
+    private Integer dropoffHubId;
+    private String dropoffHubName;
+    
+    
+
+
+	private BigDecimal dailyRate;
     private BigDecimal weeklyRate;
     private BigDecimal monthlyRate;
 
@@ -78,6 +84,22 @@ public class BookingRequest {
     public void setDropoffHubName(String dropoffHubName) {
         this.dropoffHubName = dropoffHubName;
     }
+    
+    public Integer getPickupHubId() {
+		return pickupHubId;
+	}
+
+	public void setPickupHubId(Integer pickupHubId) {
+		this.pickupHubId = pickupHubId;
+	}
+
+	public Integer getDropoffHubId() {
+		return dropoffHubId;
+	}
+
+	public void setDropoffHubId(Integer dropoffHubId) {
+		this.dropoffHubId = dropoffHubId;
+	}
 
     public BigDecimal getDailyRate() {
         return dailyRate;
