@@ -12,5 +12,7 @@ public interface AirportService {
     List<AirportResponse> getAirportsByCityId(Integer cityId);
 
     List<AirportResponse> searchAirport(String keyword);
+    
+    List<AirportResponse> getAirportsByHubId(Integer hubId);
 
 }

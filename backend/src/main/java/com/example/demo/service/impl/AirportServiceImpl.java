@@ -62,4 +62,20 @@ public class AirportServiceImpl implements AirportService {
                 .map(AirportResponse::fromEntity)
                 .toList();
     }
+    
+    @Override
+    public List<AirportResponse> getAirportsByHubId(Integer hubId) {
+
+        List<Airport> airports = repository.findByHub_HubId(hubId);
+
+        if (airports.isEmpty()) {
+            throw new ResourceNotFoundException(
+                    "No airports found for hub ID : " + hubId);
+        }
+
+        return airports.stream()
+                .map(AirportResponse::fromEntity)
+                .toList();
+    }
+    
 }
