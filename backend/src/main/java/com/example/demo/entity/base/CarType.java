@@ -8,126 +8,132 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "car_type")
 public class CarType extends BaseEntity {
-	
-	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "car_type_id")
-	private Integer carTypeId;
-	
-	 @Enumerated(EnumType.STRING)
-	 @Column(name = "car_class", nullable = false)
-	 private CarClass carClass;
 
-	 @Column(name = "car_type")
-	 private String carType;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "car_type_id")
+    private Integer carTypeId;
 
-	 @Column(name = "image_url")
-	 private String imageUrl;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "car_class", nullable = false)
+    private CarClass carClass;
 
-	 @Column(name = "daily_rate")
-	 private Double dailyRate;
+    @Column(name = "car_type", nullable = false)
+    private String carType;
 
-	 @Column(name = "weekly_rate")
-	 private Double weeklyRate;
+    @Column(name = "image_url")
+    private String imageUrl;
 
-	 @Column(name = "monthly_rate")
-	 private Double monthlyRate;
+    @Column(name = "daily_rate")
+    private Double dailyRate;
 
-	 @Column(name = "hub_id")
-	 private Integer hubId;
+    @Column(name = "weekly_rate")
+    private Double weeklyRate;
 
-	 @Column(name = "effective_from")
-	 private LocalDate effectiveFrom;
+    @Column(name = "monthly_rate")
+    private Double monthlyRate;
 
-	 @Column(name = "effective_to")
-	 private LocalDate effectiveTo;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "hub_id", nullable = false)
+    private Hub hub;
 
-	 public CarClass getCarClass() {
-		 return carClass;
-	 }
+    @Column(name = "effective_from")
+    private LocalDate effectiveFrom;
 
-	 public void setCarClass(CarClass carClass) {
-		 this.carClass = carClass;
-	 }
+    @Column(name = "effective_to")
+    private LocalDate effectiveTo;
 
-	 public String getCarType() {
-		 return carType;
-	 }
+    public CarType() {
+    }
 
-	 public void setCarType(String carType) {
-		 this.carType = carType;
-	 }
+    public Integer getCarTypeId() {
+        return carTypeId;
+    }
 
-	 public String getImageUrl() {
-		 return imageUrl;
-	 }
+    public void setCarTypeId(Integer carTypeId) {
+        this.carTypeId = carTypeId;
+    }
 
-	 public void setImageUrl(String imageUrl) {
-		 this.imageUrl = imageUrl;
-	 }
+    public CarClass getCarClass() {
+        return carClass;
+    }
 
-	 public Double getDailyRate() {
-		 return dailyRate;
-	 }
+    public void setCarClass(CarClass carClass) {
+        this.carClass = carClass;
+    }
 
-	 public void setDailyRate(Double dailyRate) {
-		 this.dailyRate = dailyRate;
-	 }
+    public String getCarType() {
+        return carType;
+    }
 
-	 public Double getWeeklyRate() {
-		 return weeklyRate;
-	 }
+    public void setCarType(String carType) {
+        this.carType = carType;
+    }
 
-	 public void setWeeklyRate(Double weeklyRate) {
-		 this.weeklyRate = weeklyRate;
-	 }
+    public String getImageUrl() {
+        return imageUrl;
+    }
 
-	 public Double getMonthlyRate() {
-		 return monthlyRate;
-	 }
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
+    }
 
-	 public void setMonthlyRate(Double monthlyRate) {
-		 this.monthlyRate = monthlyRate;
-	 }
+    public Double getDailyRate() {
+        return dailyRate;
+    }
 
-	 public Integer getHubId() {
-		 return hubId;
-	 }
+    public void setDailyRate(Double dailyRate) {
+        this.dailyRate = dailyRate;
+    }
 
-	 public void setHubId(Integer hubId) {
-		 this.hubId = hubId;
-	 }
+    public Double getWeeklyRate() {
+        return weeklyRate;
+    }
 
-	 public LocalDate getEffectiveFrom() {
-		 return effectiveFrom;
-	 }
+    public void setWeeklyRate(Double weeklyRate) {
+        this.weeklyRate = weeklyRate;
+    }
 
-	 public void setEffectiveFrom(LocalDate effectiveFrom) {
-		 this.effectiveFrom = effectiveFrom;
-	 }
+    public Double getMonthlyRate() {
+        return monthlyRate;
+    }
 
-	 public LocalDate getEffectiveTo() {
-		 return effectiveTo;
-	 }
+    public void setMonthlyRate(Double monthlyRate) {
+        this.monthlyRate = monthlyRate;
+    }
 
-	 public void setEffectiveTo(LocalDate effectiveTo) {
-		 this.effectiveTo = effectiveTo;
-	 }
-	 
-	 public Integer getCarTypeId() {
-		return carTypeId;
-	}
+    public Hub getHub() {
+        return hub;
+    }
 
-	 public void setCarTypeId(Integer carTypeId) {
-		 this.carTypeId = carTypeId;
-	 }
+    public void setHub(Hub hub) {
+        this.hub = hub;
+    }
 
+    public LocalDate getEffectiveFrom() {
+        return effectiveFrom;
+    }
+
+    public void setEffectiveFrom(LocalDate effectiveFrom) {
+        this.effectiveFrom = effectiveFrom;
+    }
+
+    public LocalDate getEffectiveTo() {
+        return effectiveTo;
+    }
+
+    public void setEffectiveTo(LocalDate effectiveTo) {
+        this.effectiveTo = effectiveTo;
+    }
 }
