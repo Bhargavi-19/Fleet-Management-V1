@@ -43,4 +43,22 @@ public class CarServiceImpl implements CarService {
 
         return CarResponse.fromEntity(car);
     }
+    
+    @Override
+    public List<CarResponse> getCarsByHub(Integer hubId) {
+
+        return repository.findByHub_HubId(hubId)
+                .stream()
+                .map(CarResponse::fromEntity)
+                .toList();
+    }
+
+    @Override
+    public List<CarResponse> getCarsByHubAndCarType(Integer hubId, Integer carTypeId) {
+
+        return repository.findByHub_HubIdAndCarType_CarTypeId(hubId, carTypeId)
+                .stream()
+                .map(CarResponse::fromEntity)
+                .toList();
+    }
 }
