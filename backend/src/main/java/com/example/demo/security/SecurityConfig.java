@@ -42,11 +42,15 @@ public class SecurityConfig {
                                 "/api/airports",
                                 "/api/airports/city/{cityId}",
                                 "/api/airports/search",
+                                "/api/airports/{hubId}",
                                 "/api/states",
                                 "/api/cities",
                                 "/api/cities/state/{stateId}",
                                 "/api/cars",
                                 "/api/cars/{carId}",
+                                "/api/cars/hub/{hubId}",
+                                "/api/cars//hub/{hubId}/car-type/{carTypeId}",
+                                "/api/car-types/status/count",
                                 "/health")
                         .permitAll()
 

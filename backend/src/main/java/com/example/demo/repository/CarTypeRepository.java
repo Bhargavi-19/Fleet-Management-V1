@@ -3,6 +3,7 @@ package com.example.demo.repository;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import com.example.demo.entity.base.CarType;
@@ -11,5 +12,12 @@ import com.example.demo.entity.base.CarType;
 public interface CarTypeRepository extends JpaRepository<CarType, Integer> {
 
     List<CarType> findByHub_HubId(Integer hubId);
+    
+    @Query("""
+            SELECT c.status, COUNT(c)
+            FROM Car c
+            GROUP BY c.status
+           """)
+    List<Object[]> countCarsByStatus();
 
 }

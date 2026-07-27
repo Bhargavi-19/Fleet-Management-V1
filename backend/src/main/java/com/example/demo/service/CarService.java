@@ -9,5 +9,9 @@ public interface CarService {
     List<CarResponse> getAllCars();
 
     CarResponse getCarById(Integer carId);
+    
+    List<CarResponse> getCarsByHub(Integer hubId);
+
+    List<CarResponse> getCarsByHubAndCarType(Integer hubId, Integer carTypeId);
 
 }
