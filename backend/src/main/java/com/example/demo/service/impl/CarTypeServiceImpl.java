@@ -19,10 +19,10 @@ public class CarTypeServiceImpl implements CarTypeService {
         this.repository = repository;
     }
 
-	@Override
-	public List<CarTypeResponse> getCarTypesByHubId(Integer hubId) {
-	
-	    List<CarType> carTypes = repository.findByHubId(hubId);
+    @Override
+    public List<CarTypeResponse> getCarTypesByHubId(Integer hubId) {
+
+        List<CarType> carTypes = repository.findByHub_HubId(hubId);
 
         if (carTypes.isEmpty()) {
             throw new ResourceNotFoundException(
@@ -32,6 +32,5 @@ public class CarTypeServiceImpl implements CarTypeService {
         return carTypes.stream()
                 .map(CarTypeResponse::fromEntity)
                 .toList();
-	}
-
+    }
 }
