@@ -12,6 +12,8 @@ public class CarTypeResponse {
     private Double dailyRate;
     private Double weeklyRate;
     private Double monthlyRate;
+	private Integer hubId;
+	private String hubName;
 
     // Default Constructor
     public CarTypeResponse() {
@@ -23,7 +25,9 @@ public class CarTypeResponse {
             String imageUrl,
             Double dailyRate,
             Double weeklyRate,
-            Double monthlyRate) {
+            Double monthlyRate,
+            Integer hubId,
+            String hubName) {
 
         this.carTypeId = carTypeId;
         this.carClass = carClass;
@@ -32,26 +36,27 @@ public class CarTypeResponse {
         this.dailyRate = dailyRate;
         this.weeklyRate = weeklyRate;
         this.monthlyRate = monthlyRate;
+        this.hubId = hubId;
+        this.hubName = hubName;
     }
 
     // Convert Entity to Response DTO
     public static CarTypeResponse fromEntity(CarType carType) {
 
-        CarTypeResponse response = new CarTypeResponse();
+    	CarTypeResponse response = new CarTypeResponse();
 
-        // If using BaseEntity
-       
         response.setCarTypeId(carType.getCarTypeId());
-
-        // If your entity has carTypeId instead, use:
-        // response.setId(carType.getCarTypeId());
-
         response.setCarClass(carType.getCarClass());
         response.setCarType(carType.getCarType());
         response.setImageUrl(carType.getImageUrl());
         response.setDailyRate(carType.getDailyRate());
         response.setWeeklyRate(carType.getWeeklyRate());
         response.setMonthlyRate(carType.getMonthlyRate());
+
+        if (carType.getHub() != null) {
+            response.setHubId(carType.getHub().getHubId());
+            response.setHubName(carType.getHub().getHubName());
+        }
 
         return response;
     }
@@ -112,6 +117,22 @@ public class CarTypeResponse {
 
     public void setMonthlyRate(Double monthlyRate) {
         this.monthlyRate = monthlyRate;
+    }
+    
+    public Integer getHubId() {
+        return hubId;
+    }
+
+    public void setHubId(Integer hubId) {
+        this.hubId = hubId;
+    }
+
+    public String getHubName() {
+        return hubName;
+    }
+
+    public void setHubName(String hubName) {
+        this.hubName = hubName;
     }
     
 }
