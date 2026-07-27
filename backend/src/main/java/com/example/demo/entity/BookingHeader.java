@@ -44,8 +44,14 @@ public class BookingHeader extends BaseEntity {
     @Column(name = "car_type_id")
     private Long carTypeId;
 
+    @Column(name = "pickup_hub_id")
+    private Integer pickupHubId;
+
     @Column(name = "pickup_hub_name")
     private String pickupHubName;
+
+    @Column(name = "dropoff_hub_id")
+    private Integer dropoffHubId;
 
     @Column(name = "dropoff_hub_name")
     private String dropoffHubName;
@@ -185,12 +191,28 @@ public class BookingHeader extends BaseEntity {
         this.carTypeId = carTypeId;
     }
 
+    public Integer getPickupHubId() {
+        return pickupHubId;
+    }
+
+    public void setPickupHubId(Integer pickupHubId) {
+        this.pickupHubId = pickupHubId;
+    }
+
     public String getPickupHubName() {
         return pickupHubName;
     }
 
     public void setPickupHubName(String pickupHubName) {
         this.pickupHubName = pickupHubName;
+    }
+
+    public Integer getDropoffHubId() {
+        return dropoffHubId;
+    }
+
+    public void setDropoffHubId(Integer dropoffHubId) {
+        this.dropoffHubId = dropoffHubId;
     }
 
     public String getDropoffHubName() {

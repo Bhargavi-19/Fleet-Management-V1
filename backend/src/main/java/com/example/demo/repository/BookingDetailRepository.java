@@ -10,4 +10,6 @@ public interface BookingDetailRepository
         extends JpaRepository<BookingDetail, Long> {
 
     List<BookingDetail> findByBookingId(Long bookingId);
+    
+    void deleteByBookingId(Long bookingId);
 }
