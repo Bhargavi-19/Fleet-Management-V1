@@ -36,7 +36,9 @@ public class SecurityConfig {
                                 "/api/customer/login",
                                 "/api/car-types/{hubId}",
                                 "/api/hubs",
-                                "/api/hubs/{hubId}",                                
+                                "/api/hubs/{hubId}",
+                                "/api/bookings/guest",
+                                "/api/bookings/guest",
                                 "/health")
                         .permitAll()
 
