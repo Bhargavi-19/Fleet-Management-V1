@@ -115,10 +115,10 @@ public class BookingServiceImpl implements BookingService {
                 customer.getAddressLine2());
 
         booking.setCityId(
-                customer.getCityId());
+                customer.getCity().getCityId());
 
         booking.setStateId(
-                customer.getStateId());
+                customer.getState().getStateId());
 
         booking.setPincode(
                 customer.getPincode());
