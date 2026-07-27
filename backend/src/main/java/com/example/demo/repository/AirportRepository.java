@@ -27,5 +27,7 @@ public interface AirportRepository extends JpaRepository<Airport, Integer> {
             ORDER BY c.city_name, a.airport_name
             """, nativeQuery = true)
     List<Airport> searchAirport(@Param("keyword") String keyword);
+    
+    List<Airport> findByHub_HubId(Integer hubId);
 
 }
