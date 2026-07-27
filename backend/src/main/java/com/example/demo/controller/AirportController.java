@@ -64,4 +64,18 @@ public class AirportController {
 
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
+    
+    @GetMapping("/{hubId}")
+    public ResponseEntity<ApiResponse<List<AirportResponse>>> getAirportsByHubId(
+            @PathVariable Integer hubId) {
+
+        List<AirportResponse> airports = service.getAirportsByHubId(hubId);
+
+        ApiResponse<List<AirportResponse>> response = new ApiResponse<>();
+        response.setSuccess(true);
+        response.setMessage("Airports fetched successfully.");
+        response.setData(airports);
+
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
 }

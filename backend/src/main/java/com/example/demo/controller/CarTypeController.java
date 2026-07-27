@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.example.demo.dto.response.CarStatusCountResponse;
 import com.example.demo.dto.response.CarTypeResponse;
 import com.example.demo.response.ApiResponse;
 import com.example.demo.service.CarTypeService;
@@ -33,5 +34,14 @@ public class CarTypeController {
         response.setData(carTypes);
 
         return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+    
+    @GetMapping("/status/count")
+    public ResponseEntity<ApiResponse<List<CarStatusCountResponse>>> getCarCountByStatus() {
+
+        List<CarStatusCountResponse> response = service.getCarCountByStatus();
+
+        return ResponseEntity.ok(
+                new ApiResponse<>(true, "Car status count fetched successfully.", response));
     }
 }

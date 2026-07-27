@@ -46,4 +46,26 @@ public class CarController {
 
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
+    
+    @GetMapping("/hub/{hubId}")
+    public ResponseEntity<ApiResponse<List<CarResponse>>> getCarsByHub(
+            @PathVariable Integer hubId) {
+
+        List<CarResponse> cars = service.getCarsByHub(hubId);
+
+        return ResponseEntity.ok(
+                new ApiResponse<>(true, "Cars fetched successfully.", cars));
+    }
+
+    @GetMapping("/hub/{hubId}/car-type/{carTypeId}")
+    public ResponseEntity<ApiResponse<List<CarResponse>>> getCarsByHubAndCarType(
+            @PathVariable Integer hubId,
+            @PathVariable Integer carTypeId) {
+
+        List<CarResponse> cars =
+                service.getCarsByHubAndCarType(hubId, carTypeId);
+
+        return ResponseEntity.ok(
+                new ApiResponse<>(true, "Cars fetched successfully.", cars));
+    }
 }

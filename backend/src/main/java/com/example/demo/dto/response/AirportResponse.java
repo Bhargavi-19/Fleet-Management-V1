@@ -7,6 +7,7 @@ public class AirportResponse {
     private Integer airportId;
     private String airportCode;
     private String airportName;
+    private Integer hubId;
 
     public AirportResponse() {
     }
@@ -35,6 +36,14 @@ public class AirportResponse {
         this.airportName = airportName;
     }
 
+    public Integer getHubId() {
+        return hubId;
+    }
+
+    public void setHubId(Integer hubId) {
+        this.hubId = hubId;
+    }
+
     public static AirportResponse fromEntity(Airport airport) {
 
         AirportResponse response = new AirportResponse();
@@ -42,6 +51,10 @@ public class AirportResponse {
         response.setAirportId(airport.getAirportId());
         response.setAirportCode(airport.getAirportCode());
         response.setAirportName(airport.getAirportName());
+
+        if (airport.getHub() != null) {
+            response.setHubId(airport.getHub().getHubId());
+        }
 
         return response;
     }
