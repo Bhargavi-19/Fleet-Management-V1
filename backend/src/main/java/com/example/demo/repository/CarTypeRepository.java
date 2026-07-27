@@ -8,8 +8,8 @@ import org.springframework.stereotype.Repository;
 import com.example.demo.entity.base.CarType;
 
 @Repository
-public interface CarTypeRepository extends JpaRepository<CarType, Long> {
+public interface CarTypeRepository extends JpaRepository<CarType, Integer> {
 
-    List<CarType> findByHubId(Integer hubId);
+    List<CarType> findByHub_HubId(Integer hubId);
 
 }

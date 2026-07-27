@@ -1,32 +1,14 @@
 package com.example.demo.entity.base;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-
-import com.example.demo.entity.base.BaseEntity;
 import com.example.demo.enums.DocumentType;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 
 @Entity
 @Table(name = "customer")
 public class Customer extends BaseEntity {
-	
-	/*
-	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "id")
-	private Integer id;
-	 */
 
-	@Id
+    @Id
     @Column(name = "customer_id", unique = true)
     private String customerId;
 
@@ -57,11 +39,13 @@ public class Customer extends BaseEntity {
     @Column(name = "address_line_2")
     private String addressLine2;
 
-    @Column(name = "city_id")
-    private Integer cityId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "city_id", nullable = false)
+    private City city;
 
-    @Column(name = "state_id")
-    private Integer stateId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "state_id", nullable = false)
+    private State state;
 
     @Column(length = 10)
     private String pincode;
@@ -76,9 +60,33 @@ public class Customer extends BaseEntity {
     @Column(name = "file_url")
     private String fileUrl;
 
-    public Customer() {
-    	
-    }
+
+	public Customer() {
+		super();
+		// TODO Auto-generated constructor stub
+	}
+
+	public Customer(String customerId, String firstName, String lastName, String email, String phone,
+			String passwordHash, String drivingLicenseNo, String passportNo, String addressLine1, String addressLine2,
+			City city, State state, String pincode, Boolean isActive, DocumentType documentType, String fileUrl) {
+		super();
+		this.customerId = customerId;
+		this.firstName = firstName;
+		this.lastName = lastName;
+		this.email = email;
+		this.phone = phone;
+		this.passwordHash = passwordHash;
+		this.drivingLicenseNo = drivingLicenseNo;
+		this.passportNo = passportNo;
+		this.addressLine1 = addressLine1;
+		this.addressLine2 = addressLine2;
+		this.city = city;
+		this.state = state;
+		this.pincode = pincode;
+		this.isActive = isActive;
+		this.documentType = documentType;
+		this.fileUrl = fileUrl;
+	}
 
 	public String getCustomerId() {
 		return customerId;
@@ -160,20 +168,20 @@ public class Customer extends BaseEntity {
 		this.addressLine2 = addressLine2;
 	}
 
-	public Integer getCityId() {
-		return cityId;
+	public City getCity() {
+		return city;
 	}
 
-	public void setCityId(Integer cityId) {
-		this.cityId = cityId;
+	public void setCity(City city) {
+		this.city = city;
 	}
 
-	public Integer getStateId() {
-		return stateId;
+	public State getState() {
+		return state;
 	}
 
-	public void setStateId(Integer stateId) {
-		this.stateId = stateId;
+	public void setState(State state) {
+		this.state = state;
 	}
 
 	public String getPincode() {
@@ -208,7 +216,4 @@ public class Customer extends BaseEntity {
 		this.fileUrl = fileUrl;
 	}
     
-    
-
-    // Generate Getters and Setters
 }

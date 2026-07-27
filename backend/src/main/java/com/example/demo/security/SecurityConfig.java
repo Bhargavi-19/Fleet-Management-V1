@@ -26,17 +26,27 @@ public class SecurityConfig {
             throws Exception {
 
         http
-
+        		.cors(cors -> {})
                 .csrf(csrf -> csrf.disable())
 
                 .authorizeHttpRequests(auth -> auth
-
+                		.requestMatchers("/images/**").permitAll()
                         .requestMatchers(
                                 "/api/customer/register",
                                 "/api/customer/login",
                                 "/api/car-types/{hubId}",
                                 "/api/hubs",
-                                "/api/hubs/{hubId}",                                
+                                "/api/hubs/{hubId}",
+                                "/api/addons",
+                                "/api/addons/{hubId}",
+                                "/api/airports",
+                                "/api/airports/city/{cityId}",
+                                "/api/airports/search",
+                                "/api/states",
+                                "/api/cities",
+                                "/api/cities/state/{stateId}",
+                                "/api/cars",
+                                "/api/cars/{carId}",
                                 "/health")
                         .permitAll()
 

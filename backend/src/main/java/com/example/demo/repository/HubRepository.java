@@ -13,6 +13,6 @@ public interface HubRepository extends JpaRepository<Hub, Integer> {
 
     Optional<Hub> findByHubId(Integer hubId);
 
-    List<Hub> findByStateIdAndCityId(Integer stateId, Integer cityId);
+    List<Hub> findByState_StateIdAndCity_CityId(Integer stateId, Integer cityId);
 
 }
