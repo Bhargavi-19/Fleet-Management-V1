@@ -131,6 +131,35 @@ public class BookingHeader extends BaseEntity {
     
     @Column(name = "passport_no")
     private String passportNo;
+ 
+    
+ // =====================================================
+ // Assigned Vehicle Information (Snapshot)
+ // =====================================================
+
+ @Column(name = "assigned_car_id")
+ private Integer assignedCarId;
+
+ @Column(name = "assigned_car_registration_no", length = 20)
+ private String assignedCarRegistrationNo;
+
+ @Column(name = "assigned_car_brand_name", length = 50)
+ private String assignedCarBrandName;
+
+ @Column(name = "assigned_car_model_name", length = 50)
+ private String assignedCarModelName;
+
+ @Column(name = "handover_date")
+ private LocalDateTime handoverDate;
+
+ @Column(name = "fuel_level_out")
+ private Integer fuelLevelOut;
+ 
+ @Column(name = "fuel_level_in")
+ private Integer fuelLevelIn;
+
+ @Column(name = "fuel_charges", precision = 10, scale = 2)
+ private BigDecimal fuelCharges;
 
     public BookingHeader() {
     }
@@ -147,7 +176,24 @@ public class BookingHeader extends BaseEntity {
         return date;
     }
 
-    public void setDate(LocalDateTime date) {
+    
+    public Integer getFuelLevelIn() {
+		return fuelLevelIn;
+	}
+
+	public void setFuelLevelIn(Integer fuelLevelIn) {
+		this.fuelLevelIn = fuelLevelIn;
+	}
+
+	public BigDecimal getFuelCharges() {
+		return fuelCharges;
+	}
+
+	public void setFuelCharges(BigDecimal fuelCharges) {
+		this.fuelCharges = fuelCharges;
+	}
+
+	public void setDate(LocalDateTime date) {
         this.date = date;
     }
 
@@ -406,4 +452,54 @@ public class BookingHeader extends BaseEntity {
     public void setPassportNo(String passportNo) {
         this.passportNo = passportNo;
     }
+    
+    public Integer getAssignedCarId() {
+        return assignedCarId;
+    }
+
+    public void setAssignedCarId(Integer assignedCarId) {
+        this.assignedCarId = assignedCarId;
+    }
+
+    public String getAssignedCarRegistrationNo() {
+        return assignedCarRegistrationNo;
+    }
+
+    public void setAssignedCarRegistrationNo(String assignedCarRegistrationNo) {
+        this.assignedCarRegistrationNo = assignedCarRegistrationNo;
+    }
+
+    public String getAssignedCarBrandName() {
+        return assignedCarBrandName;
+    }
+
+    public void setAssignedCarBrandName(String assignedCarBrandName) {
+        this.assignedCarBrandName = assignedCarBrandName;
+    }
+
+    public String getAssignedCarModelName() {
+        return assignedCarModelName;
+    }
+
+    public void setAssignedCarModelName(String assignedCarModelName) {
+        this.assignedCarModelName = assignedCarModelName;
+    }
+
+    public LocalDateTime getHandoverDate() {
+        return handoverDate;
+    }
+
+    public void setHandoverDate(LocalDateTime handoverDate) {
+        this.handoverDate = handoverDate;
+    }
+
+    public Integer getFuelLevelOut() {
+        return fuelLevelOut;
+    }
+
+    public void setFuelLevelOut(Integer fuelLevelOut) {
+        this.fuelLevelOut = fuelLevelOut;
+    }
+    
+    
 }

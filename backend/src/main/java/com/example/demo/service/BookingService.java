@@ -38,7 +38,22 @@ public interface BookingService {
     ApiResponse<BookingStatsResponse> getBookingStats();
     
     
-    ApiResponse<BookingResponse> updateBookingStatus(
+    ApiResponse<BookingPageResponse> getStaffBookings(
+            int page,
+            int size,
+            BookingStatus status);
+    
+    ApiResponse<BookingResponse> getStaffBookingById(
+            Long bookingId);
+    
+    ApiResponse<BookingStatsResponse> getStaffBookingStats();
+    
+    ApiResponse<BookingResponse> updateStaffBookingStatus(
             Long bookingId,
             UpdateBookingStatusRequest request);
+    
+    ApiResponse<BookingResponse> cancelStaffBooking(
+            Long bookingId);
+    
+    
 }
