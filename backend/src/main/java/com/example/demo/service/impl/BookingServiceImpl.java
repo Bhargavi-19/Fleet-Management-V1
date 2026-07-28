@@ -1,5 +1,6 @@
 package com.example.demo.service.impl;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -22,11 +23,13 @@ import com.example.demo.dto.response.BookingStatsResponse;
 import com.example.demo.entity.BookingDetail;
 import com.example.demo.entity.BookingHeader;
 import com.example.demo.entity.base.Customer;
+import com.example.demo.entity.base.Staff;
 import com.example.demo.enums.BookingSource;
 import com.example.demo.enums.BookingStatus;
 import com.example.demo.repository.BookingDetailRepository;
 import com.example.demo.repository.BookingHeaderRepository;
 import com.example.demo.repository.CustomerRepository;
+import com.example.demo.repository.StaffRepository;
 import com.example.demo.response.ApiResponse;
 import com.example.demo.service.BookingService;
 import com.example.demo.service.EmailService;
@@ -44,17 +47,19 @@ public class BookingServiceImpl implements BookingService {
     private final BookingDetailRepository bookingDetailRepository;
     private final CustomerRepository customerRepository;
     private final EmailService emailService;
+    private final StaffRepository staffRepository;
 
     public BookingServiceImpl(
             BookingHeaderRepository bookingHeaderRepository,
             BookingDetailRepository bookingDetailRepository,
             CustomerRepository customerRepository,
-            EmailService emailService)
-    {
+            StaffRepository staffRepository,
+            EmailService emailService) {
 
         this.bookingHeaderRepository = bookingHeaderRepository;
         this.bookingDetailRepository = bookingDetailRepository;
         this.customerRepository = customerRepository;
+        this.staffRepository = staffRepository;
         this.emailService = emailService;
     }
     
@@ -1128,91 +1133,505 @@ public class BookingServiceImpl implements BookingService {
         return false;
     }
 
+ 
+	@Override
+	@Transactional(readOnly = true)
+	public ApiResponse<BookingPageResponse> getStaffBookings(int page, int size, BookingStatus status) {
+		
+
+	    // --------------------------------
+	    // Validate pagination
+	    // --------------------------------
+
+	    if (page < 0) {
+	        throw new RuntimeException(
+	                "Page number cannot be negative");
+	    }
+
+	    if (size <= 0) {
+	        throw new RuntimeException(
+	                "Page size must be greater than 0");
+	    }
+
+	    if (size > 100) {
+	        size = 100;
+	    }
+
+	    // --------------------------------
+	    // Logged-in Staff
+	    // --------------------------------
+
+	    Authentication authentication =
+	            SecurityContextHolder
+	                    .getContext()
+	                    .getAuthentication();
+
+	    if (authentication == null
+	            || !authentication.isAuthenticated()
+	            || "anonymousUser".equals(authentication.getPrincipal())) {
+
+	        throw new RuntimeException(
+	                "Staff is not authenticated");
+	    }
+
+	    String email = authentication.getName();
+
+	    Staff staff =
+	            staffRepository
+	                    .findByEmail(email)
+	                    .orElseThrow(() ->
+	                            new RuntimeException(
+	                                    "Staff not found"));
+
+	    Integer hubId =
+	            staff.getHub().getHubId();
+
+	    // --------------------------------
+	    // Pagination
+	    // --------------------------------
+
+	    Pageable pageable =
+	            PageRequest.of(
+	                    page,
+	                    size,
+	                    Sort.by("createdAt")
+	                            .descending());
+
+	    Page<BookingHeader> bookingPage;
+
+	    // --------------------------------
+	    // Optional Status Filter
+	    // --------------------------------
+
+	    if (status != null) {
+
+	        bookingPage =
+	                bookingHeaderRepository
+	                        .findByPickupHubIdAndBookingStatus(
+	                                hubId,
+	                                status,
+	                                pageable);
+
+	    } else {
+
+	        bookingPage =
+	                bookingHeaderRepository
+	                        .findByPickupHubId(
+	                                hubId,
+	                                pageable);
+	    }
+
+	    // --------------------------------
+	    // Entity → DTO
+	    // --------------------------------
+
+	    List<BookingResponse> bookings =
+	            bookingPage
+	                    .getContent()
+	                    .stream()
+	                    .map(this::mapToBookingResponse)
+	                    .toList();
+
+	    // --------------------------------
+	    // Pagination Response
+	    // --------------------------------
+
+	    BookingPageResponse response =
+	            new BookingPageResponse();
+
+	    response.setBookings(bookings);
+
+	    response.setCurrentPage(
+	            bookingPage.getNumber());
+
+	    response.setPageSize(
+	            bookingPage.getSize());
+
+	    response.setTotalElements(
+	            bookingPage.getTotalElements());
+
+	    response.setTotalPages(
+	            bookingPage.getTotalPages());
+
+	    response.setFirst(
+	            bookingPage.isFirst());
+
+	    response.setLast(
+	            bookingPage.isLast());
+
+	    return new ApiResponse<>(
+	            true,
+	            "Staff bookings fetched successfully",
+	            response);
+	}
+	
+	
+	@Override
+	@Transactional(readOnly = true)
+	public ApiResponse<BookingResponse> getStaffBookingById(
+	        Long bookingId) {
+
+	    // ----------------------------
+	    // Logged-in Staff
+	    // ----------------------------
+
+	    Authentication authentication =
+	            SecurityContextHolder
+	                    .getContext()
+	                    .getAuthentication();
+
+	    if (authentication == null
+	            || !authentication.isAuthenticated()
+	            || "anonymousUser".equals(authentication.getPrincipal())) {
+
+	        throw new RuntimeException(
+	                "Staff is not authenticated");
+	    }
+
+	    String email = authentication.getName();
+
+	    Staff staff =
+	            staffRepository
+	                    .findByEmail(email)
+	                    .orElseThrow(() ->
+	                            new RuntimeException(
+	                                    "Staff not found"));
+
+	    Integer hubId =
+	            staff.getHub().getHubId();
+
+	    // ----------------------------
+	    // Find Booking
+	    // ----------------------------
+
+	    BookingHeader booking =
+	            bookingHeaderRepository
+	                    .findById(bookingId)
+	                    .orElseThrow(() ->
+	                            new RuntimeException(
+	                                    "Booking not found"));
+
+	    // ----------------------------
+	    // Hub Authorization
+	    // ----------------------------
+
+	    if (!hubId.equals(
+	            booking.getPickupHubId())) {
+
+	        throw new RuntimeException(
+	                "You are not authorized to access this booking");
+	    }
+
+	    BookingResponse response =
+	            mapToBookingResponse(booking);
+
+	    return new ApiResponse<>(
+	            true,
+	            "Booking fetched successfully",
+	            response);
+	}
+	
+	@Override
+	@Transactional(readOnly = true)
+	public ApiResponse<BookingStatsResponse> getStaffBookingStats() {
+
+	    //-----------------------------------
+	    // Logged-in Staff
+	    //-----------------------------------
+
+	    Authentication authentication =
+	            SecurityContextHolder
+	                    .getContext()
+	                    .getAuthentication();
+
+	    if (authentication == null
+	            || !authentication.isAuthenticated()
+	            || "anonymousUser".equals(authentication.getPrincipal())) {
+
+	        throw new RuntimeException(
+	                "Staff is not authenticated");
+	    }
+
+	    String email = authentication.getName();
+
+	    Staff staff =
+	            staffRepository
+	                    .findByEmail(email)
+	                    .orElseThrow(() ->
+	                            new RuntimeException(
+	                                    "Staff not found"));
+
+	    Integer hubId =
+	            staff.getHub().getHubId();
+
+	    //-----------------------------------
+	    // Today's range
+	    //-----------------------------------
+
+	    LocalDateTime startOfDay =
+	            LocalDate.now().atStartOfDay();
+
+	    LocalDateTime endOfDay =
+	            startOfDay.plusDays(1);
+
+	    //-----------------------------------
+	    // Counts
+	    //-----------------------------------
+
+	    long total =
+	            bookingHeaderRepository
+	                    .countByPickupHubId(hubId);
+
+	    long pending =
+	            bookingHeaderRepository
+	                    .countByPickupHubIdAndBookingStatus(
+	                            hubId,
+	                            BookingStatus.PENDING);
+
+	    long confirmed =
+	            bookingHeaderRepository
+	                    .countByPickupHubIdAndBookingStatus(
+	                            hubId,
+	                            BookingStatus.CONFIRMED);
+
+	    long completed =
+	            bookingHeaderRepository
+	                    .countByPickupHubIdAndBookingStatus(
+	                            hubId,
+	                            BookingStatus.COMPLETED);
+
+	    long cancelled =
+	            bookingHeaderRepository
+	                    .countByPickupHubIdAndBookingStatus(
+	                            hubId,
+	                            BookingStatus.CANCELLED);
+
+	    long todayBookings =
+	            bookingHeaderRepository
+	                    .countByPickupHubIdAndCreatedAtBetween(
+	                            hubId,
+	                            startOfDay,
+	                            endOfDay);
+
+	    //-----------------------------------
+	    // Response
+	    //-----------------------------------
+
+	    BookingStatsResponse response =
+	            new BookingStatsResponse();
+
+	    response.setTotal(total);
+	    response.setTodayBookings(todayBookings);
+
+	    response.setPending(pending);
+	    response.setConfirmed(confirmed);
+	    response.setCompleted(completed);
+	    response.setCancelled(cancelled);
+
+	    return new ApiResponse<>(
+	            true,
+	            "Staff booking statistics fetched successfully",
+	            response);
+	}
+	
+	
+	@Override
+	@Transactional
+	public ApiResponse<BookingResponse> updateStaffBookingStatus(
+	        Long bookingId,
+	        UpdateBookingStatusRequest request) {
+
+	    //--------------------------------
+	    // Logged-in Staff
+	    //--------------------------------
+
+	    Authentication authentication =
+	            SecurityContextHolder
+	                    .getContext()
+	                    .getAuthentication();
+
+	    if (authentication == null
+	            || !authentication.isAuthenticated()
+	            || "anonymousUser".equals(authentication.getPrincipal())) {
+
+	        throw new RuntimeException(
+	                "Staff is not authenticated");
+	    }
+
+	    String email = authentication.getName();
+
+	    Staff staff =
+	            staffRepository
+	                    .findByEmail(email)
+	                    .orElseThrow(() ->
+	                            new RuntimeException(
+	                                    "Staff not found"));
+
+	    Integer hubId =
+	            staff.getHub().getHubId();
+
+	    //--------------------------------
+	    // Find Booking
+	    //--------------------------------
+
+	    BookingHeader booking =
+	            bookingHeaderRepository
+	                    .findById(bookingId)
+	                    .orElseThrow(() ->
+	                            new RuntimeException(
+	                                    "Booking not found"));
+
+	    //--------------------------------
+	    // Hub Authorization
+	    //--------------------------------
+
+	    if (!hubId.equals(
+	            booking.getPickupHubId())) {
+
+	        throw new RuntimeException(
+	                "You are not authorized to update this booking");
+	    }
+
+	    //--------------------------------
+	    // Status Validation
+	    //--------------------------------
+
+	    BookingStatus newStatus =
+	            request.getStatus();
+
+	    if (newStatus == null) {
+
+	        throw new RuntimeException(
+	                "Booking status is required");
+	    }
+
+	    BookingStatus currentStatus =
+	            booking.getBookingStatus();
+
+	    if (!isValidStatusTransition(
+	            currentStatus,
+	            newStatus)) {
+
+	        throw new RuntimeException(
+	                "Invalid booking status transition from "
+	                        + currentStatus
+	                        + " to "
+	                        + newStatus);
+	    }
+
+	    //--------------------------------
+	    // Update
+	    //--------------------------------
+
+	    booking.setBookingStatus(
+	            newStatus);
+
+	    BookingHeader savedBooking =
+	            bookingHeaderRepository
+	                    .save(booking);
+
+	    BookingResponse response =
+	            mapToBookingResponse(savedBooking);
+
+	    return new ApiResponse<>(
+	            true,
+	            "Booking status updated successfully",
+	            response);
+	}
+	
+	
+	@Override
+	@Transactional
+	public ApiResponse<BookingResponse> cancelStaffBooking(
+	        Long bookingId) {
+
+	    //--------------------------------
+	    // Logged-in Staff
+	    //--------------------------------
+
+	    Authentication authentication =
+	            SecurityContextHolder
+	                    .getContext()
+	                    .getAuthentication();
+
+	    if (authentication == null
+	            || !authentication.isAuthenticated()
+	            || "anonymousUser".equals(authentication.getPrincipal())) {
+
+	        throw new RuntimeException(
+	                "Staff is not authenticated");
+	    }
+
+	    String email = authentication.getName();
+
+	    Staff staff =
+	            staffRepository
+	                    .findByEmail(email)
+	                    .orElseThrow(() ->
+	                            new RuntimeException(
+	                                    "Staff not found"));
+
+	    Integer hubId =
+	            staff.getHub().getHubId();
+
+	    //--------------------------------
+	    // Booking
+	    //--------------------------------
+
+	    BookingHeader booking =
+	            bookingHeaderRepository
+	                    .findById(bookingId)
+	                    .orElseThrow(() ->
+	                            new RuntimeException(
+	                                    "Booking not found"));
+
+	    //--------------------------------
+	    // Hub Validation
+	    //--------------------------------
+
+	    if (!hubId.equals(
+	            booking.getPickupHubId())) {
+
+	        throw new RuntimeException(
+	                "You are not authorized to cancel this booking");
+	    }
+
+	    //--------------------------------
+	    // Validation
+	    //--------------------------------
+
+	    if (booking.getBookingStatus()
+	            == BookingStatus.CANCELLED) {
+
+	        throw new RuntimeException(
+	                "Booking is already cancelled");
+	    }
+
+	    if (booking.getBookingStatus()
+	            == BookingStatus.COMPLETED) {
+
+	        throw new RuntimeException(
+	                "Completed booking cannot be cancelled");
+	    }
+
+	    //--------------------------------
+	    // Cancel
+	    //--------------------------------
+
+	    booking.setBookingStatus(
+	            BookingStatus.CANCELLED);
+
+	    BookingHeader savedBooking =
+	            bookingHeaderRepository.save(booking);
+
+	    BookingResponse response =
+	            mapToBookingResponse(savedBooking);
+
+	    return new ApiResponse<>(
+	            true,
+	            "Booking cancelled successfully",
+	            response);
+	}
     
-    @Override
-    @Transactional
-    public ApiResponse<BookingResponse> updateBookingStatus(
-            Long bookingId,
-            UpdateBookingStatusRequest request) {
-
-        Authentication authentication =
-                SecurityContextHolder
-                        .getContext()
-                        .getAuthentication();
-
-        if (authentication == null
-                || !authentication.isAuthenticated()
-                || "anonymousUser".equals(
-                        authentication.getPrincipal())) {
-
-            throw new RuntimeException(
-                    "Staff is not authenticated");
-        }
-
-        // TODO:
-        // After Staff module is connected:
-        //
-        // String email = authentication.getName();
-        //
-        // Staff staff = staffRepository
-        //        .findByEmail(email)
-        //        .orElseThrow(...);
-        //
-        // Integer staffHubId = staff.getHubId();
-
-        BookingHeader booking =
-                bookingHeaderRepository
-                        .findById(bookingId)
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Booking not found"));
-
-        /*
-         * TODO after Staff module:
-         *
-         * if (!booking.getPickupHubId()
-         *         .equals(staffHubId)) {
-         *
-         *     throw new RuntimeException(
-         *         "You are not authorized to update "
-         *         + "bookings of another hub");
-         * }
-         */
-
-        BookingStatus newStatus =
-                request.getStatus();
-
-        if (newStatus == null) {
-
-            throw new RuntimeException(
-                    "Booking status is required");
-        }
-
-        BookingStatus currentStatus =
-                booking.getBookingStatus();
-
-        if (!isValidStatusTransition(
-                currentStatus,
-                newStatus)) {
-
-            throw new RuntimeException(
-                    "Invalid booking status transition from "
-                    + currentStatus
-                    + " to "
-                    + newStatus);
-        }
-
-        booking.setBookingStatus(newStatus);
-
-        BookingHeader savedBooking =
-                bookingHeaderRepository.save(booking);
-
-        BookingResponse response =
-                mapToBookingResponse(savedBooking);
-
-        return new ApiResponse<>(
-                true,
-                "Booking status updated successfully",
-                response);
-    }
-}
+	}
+	
