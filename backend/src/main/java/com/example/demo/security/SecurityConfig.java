@@ -30,36 +30,34 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
 
                 .authorizeHttpRequests(auth -> auth
-                		.requestMatchers("/images/**").permitAll()
-                        .requestMatchers(
-                                "/api/customer/register",
-                                "/api/customer/login",
-                                "/api/car-types/{hubId}",
-                                "/api/hubs",
-                                "/api/hubs/{hubId}",
-                                "/api/addons",
-                                "/api/addons/{hubId}",
-                                "/api/airports",
-                                "/api/airports/city/{cityId}",
-                                "/api/airports/search",
-                                "/api/airports/{hubId}",
-                                "/api/states",
-                                "/api/cities",
-                                "/api/cities/state/{stateId}",
-                                "/api/cars",
-                                "/api/cars/{carId}",
-                                "/api/cars/hub/{hubId}",
-                                "/api/cars//hub/{hubId}/car-type/{carTypeId}",
-                                "/api/car-types/status/count",
-                                "/api/staff/register",
-                                "/api/staff/{id}",
-                                "/api/staff/hub/{hubId}",
-                                "/api/staff",
-                                "/health")
-                        .permitAll()
 
-                        .anyRequest()
-                        .authenticated())
+                	    // Public APIs
+                	    .requestMatchers(
+                	        "/api/customer/register",
+                	        "/api/customer/login",
+                	        "/api/staff/register",
+                	        "/api/staff/login",
+                	        "/health"
+                	    ).permitAll()
+
+                	    // Customer APIs
+                	    .requestMatchers("/api/customer/**")
+                	    .hasRole("CUSTOMER")
+
+                	    .requestMatchers("/api/bookings/**")
+                	    .hasRole("CUSTOMER")
+
+                	    // Staff APIs
+                	    .requestMatchers("/api/staff/bookings/**")
+                	    .hasRole("STAFF")
+
+                	    .requestMatchers("/api/staff/**")
+                	    .hasRole("STAFF")
+
+                	    // Everything else
+                	    .anyRequest()
+                	    .authenticated()
+                	)
 
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(
