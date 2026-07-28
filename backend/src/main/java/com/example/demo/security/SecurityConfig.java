@@ -51,6 +51,10 @@ public class SecurityConfig {
                                 "/api/cars/hub/{hubId}",
                                 "/api/cars//hub/{hubId}/car-type/{carTypeId}",
                                 "/api/car-types/status/count",
+                                "/api/staff/register",
+                                "/api/staff/{id}",
+                                "/api/staff/hub/{hubId}",
+                                "/api/staff",
                                 "/health")
                         .permitAll()
 
