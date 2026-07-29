@@ -3,6 +3,7 @@ target/
 
 ### Local secrets - never commit these ###
 # Database password, Gmail app password, Google OAuth client secret.
+src/main/resources/application.properties
 src/main/resources/application-local.properties
 application-local.properties
 *-local.properties
