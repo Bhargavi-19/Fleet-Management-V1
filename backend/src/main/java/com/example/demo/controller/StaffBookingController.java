@@ -15,8 +15,11 @@ import com.example.demo.dto.response.BookingPageResponse;
 import com.example.demo.dto.response.BookingResponse;
 import com.example.demo.dto.response.BookingStatsResponse;
 import com.example.demo.enums.BookingStatus;
+import com.example.demo.enums.HubScope;
 import com.example.demo.response.ApiResponse;
 import com.example.demo.service.BookingService;
+
+import jakarta.validation.Valid;
 
 @RestController
 	@RequestMapping("/api/staff/bookings")
@@ -35,14 +38,23 @@ import com.example.demo.service.BookingService;
 	            int size,
 
 	            @RequestParam(required = false)
-	            BookingStatus status) {
+	            BookingStatus status,
+
+	            /**
+	             * PICKUP  - bookings this hub hands over
+	             * RETURN  - bookings this hub takes back
+	             * ALL     - either end (the default)
+	             */
+	            @RequestParam(required = false)
+	            HubScope scope) {
 
 	        return ResponseEntity.ok(
 
 	                bookingService.getStaffBookings(
 	                        page,
 	                        size,
-	                        status));
+	                        status,
+	                        scope));
 	    }
 	    
 	    @GetMapping("/{bookingId}")
@@ -70,6 +82,7 @@ import com.example.demo.service.BookingService;
 
 	                    @PathVariable Long bookingId,
 
+	                    @Valid
 	                    @RequestBody
 	                    UpdateBookingStatusRequest request) {
 

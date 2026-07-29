@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 
 import com.example.demo.dto.response.CarResponse;
 import com.example.demo.entity.base.Car;
+import com.example.demo.enums.CarStatus;
 import com.example.demo.exception.error.ResourceNotFoundException;
 import com.example.demo.repository.CarRepository;
 import com.example.demo.service.CarService;
@@ -45,19 +46,35 @@ public class CarServiceImpl implements CarService {
     }
     
     @Override
-    public List<CarResponse> getCarsByHub(Integer hubId) {
+    public List<CarResponse> getCarsByHub(Integer hubId, CarStatus status) {
 
-        return repository.findByHub_HubId(hubId)
-                .stream()
+        List<Car> cars;
+
+        if (status == null) {
+            cars = repository.findByHub_HubId(hubId);
+        } else {
+            cars = repository.findByHub_HubIdAndStatus(hubId, status);
+        }
+
+        return cars.stream()
                 .map(CarResponse::fromEntity)
                 .toList();
     }
 
     @Override
-    public List<CarResponse> getCarsByHubAndCarType(Integer hubId, Integer carTypeId) {
+    public List<CarResponse> getCarsByHubAndCarType(
+            Integer hubId, Integer carTypeId, CarStatus status) {
 
-        return repository.findByHub_HubIdAndCarType_CarTypeId(hubId, carTypeId)
-                .stream()
+        List<Car> cars;
+
+        if (status == null) {
+            cars = repository.findByHub_HubIdAndCarType_CarTypeId(hubId, carTypeId);
+        } else {
+            cars = repository.findByHub_HubIdAndCarType_CarTypeIdAndStatus(
+                    hubId, carTypeId, status);
+        }
+
+        return cars.stream()
                 .map(CarResponse::fromEntity)
                 .toList();
     }

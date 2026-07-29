@@ -5,6 +5,8 @@ import java.time.LocalDateTime;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import com.example.demo.entity.BookingHeader;
 import com.example.demo.enums.BookingStatus;
@@ -76,4 +78,49 @@ public interface BookingHeaderRepository
             Integer pickupHubId,
             LocalDateTime start,
             LocalDateTime end);
+
+    // =====================================================
+    // STAFF - drop-off hub (the Return module)
+    //
+    // A one-way rental is collected at one hub and returned to another, so
+    // the Return module must look at dropoff_hub_id, not pickup_hub_id.
+    // =====================================================
+
+    Page<BookingHeader> findByDropoffHubId(
+            Integer dropoffHubId,
+            Pageable pageable);
+
+    Page<BookingHeader> findByDropoffHubIdAndBookingStatus(
+            Integer dropoffHubId,
+            BookingStatus bookingStatus,
+            Pageable pageable);
+
+    long countByDropoffHubId(Integer dropoffHubId);
+
+    long countByDropoffHubIdAndBookingStatus(
+            Integer dropoffHubId,
+            BookingStatus bookingStatus);
+
+    // =====================================================
+    // STAFF - everything the hub is involved in, either end
+    // =====================================================
+
+    @Query("""
+            SELECT b FROM BookingHeader b
+            WHERE (b.pickupHubId = :hubId OR b.dropoffHubId = :hubId)
+              AND (:status IS NULL OR b.bookingStatus = :status)
+            """)
+    Page<BookingHeader> findByEitherHub(
+            @Param("hubId") Integer hubId,
+            @Param("status") BookingStatus status,
+            Pageable pageable);
+
+    @Query("""
+            SELECT COUNT(b) FROM BookingHeader b
+            WHERE (b.pickupHubId = :hubId OR b.dropoffHubId = :hubId)
+              AND (:status IS NULL OR b.bookingStatus = :status)
+            """)
+    long countByEitherHub(
+            @Param("hubId") Integer hubId,
+            @Param("status") BookingStatus status);
 }

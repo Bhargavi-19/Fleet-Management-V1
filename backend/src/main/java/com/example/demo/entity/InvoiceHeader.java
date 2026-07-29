@@ -25,6 +25,21 @@ public class InvoiceHeader extends BaseEntity {
     private Long bookingId;
 
     // ==========================================
+    // Invoice identity (BRD: Invoice Header Table)
+    // ==========================================
+
+    /** Human readable number shown on the PDF, e.g. INV-2026-000042. */
+    @Column(name = "invoice_no", unique = true, length = 30)
+    private String invoiceNo;
+
+    /** When the invoice was raised - i.e. when the car came back. */
+    @Column(name = "invoice_date")
+    private LocalDateTime invoiceDate;
+
+    @Column(name = "return_date")
+    private LocalDateTime returnDate;
+
+    // ==========================================
     // Customer Snapshot
     // ==========================================
 
@@ -48,6 +63,22 @@ public class InvoiceHeader extends BaseEntity {
 
     @Column(name = "passport_no")
     private String passportNo;
+
+    // Address snapshot, copied from the booking (BRD: Invoice Header Table)
+    @Column(name = "address_line_1")
+    private String addressLine1;
+
+    @Column(name = "address_line_2")
+    private String addressLine2;
+
+    @Column(name = "city_id")
+    private Integer cityId;
+
+    @Column(name = "state_id")
+    private Integer stateId;
+
+    @Column(name = "pincode", length = 10)
+    private String pincode;
 
     // ==========================================
     // Vehicle Snapshot
@@ -419,4 +450,72 @@ public class InvoiceHeader extends BaseEntity {
     
     
     
+
+    // ---------- Invoice identity ----------
+
+    public String getInvoiceNo() {
+        return invoiceNo;
+    }
+
+    public void setInvoiceNo(String invoiceNo) {
+        this.invoiceNo = invoiceNo;
+    }
+
+    public LocalDateTime getInvoiceDate() {
+        return invoiceDate;
+    }
+
+    public void setInvoiceDate(LocalDateTime invoiceDate) {
+        this.invoiceDate = invoiceDate;
+    }
+
+    public LocalDateTime getReturnDate() {
+        return returnDate;
+    }
+
+    public void setReturnDate(LocalDateTime returnDate) {
+        this.returnDate = returnDate;
+    }
+
+    // ---------- Address snapshot ----------
+
+    public String getAddressLine1() {
+        return addressLine1;
+    }
+
+    public void setAddressLine1(String addressLine1) {
+        this.addressLine1 = addressLine1;
+    }
+
+    public String getAddressLine2() {
+        return addressLine2;
+    }
+
+    public void setAddressLine2(String addressLine2) {
+        this.addressLine2 = addressLine2;
+    }
+
+    public Integer getCityId() {
+        return cityId;
+    }
+
+    public void setCityId(Integer cityId) {
+        this.cityId = cityId;
+    }
+
+    public Integer getStateId() {
+        return stateId;
+    }
+
+    public void setStateId(Integer stateId) {
+        this.stateId = stateId;
+    }
+
+    public String getPincode() {
+        return pincode;
+    }
+
+    public void setPincode(String pincode) {
+        this.pincode = pincode;
+    }
 }

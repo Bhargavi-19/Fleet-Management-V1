@@ -9,6 +9,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import com.example.demo.exception.error.BusinessException;
+import com.example.demo.exception.error.ResourceNotFoundException;
 import com.example.demo.dto.request.LoginRequest;
 import com.example.demo.dto.request.RegisterStaffRequest;
 import com.example.demo.dto.request.UpdateStaffRequest;
@@ -54,7 +56,7 @@ public class StaffServiceImpl implements StaffService {
         }
 
         Hub hub = hubRepository.findById(request.getHubId())
-                .orElseThrow(() -> new RuntimeException("Hub not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Hub not found"));
 
         Staff staff = new Staff();
 
@@ -95,7 +97,7 @@ public class StaffServiceImpl implements StaffService {
         Staff staff = staffRepository
                 .findByEmail(request.getEmail())
                 .orElseThrow(() ->
-                        new RuntimeException("Staff not found"));
+                        new ResourceNotFoundException("Staff not found"));
 
         String token = jwtService.generateToken(staff.getEmail());
 
@@ -121,7 +123,7 @@ public class StaffServiceImpl implements StaffService {
 
         return staffRepository.findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException("Logged in staff not found"));
+                        new ResourceNotFoundException("Logged in staff not found"));
     }
     
     @Override
@@ -132,7 +134,7 @@ public class StaffServiceImpl implements StaffService {
 
         Staff staff = staffRepository.findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Staff not found"));
+                        new ResourceNotFoundException("Staff not found"));
 
         return new ApiResponse<>(
                 true,
@@ -184,7 +186,7 @@ public class StaffServiceImpl implements StaffService {
 
         Staff staff = staffRepository.findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Staff not found"));
+                        new ResourceNotFoundException("Staff not found"));
 
         staffRepository.delete(staff);
 
@@ -204,17 +206,17 @@ public class StaffServiceImpl implements StaffService {
 
         Staff staff = staffRepository.findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Staff not found"));
+                        new ResourceNotFoundException("Staff not found"));
 
         if (!staff.getPhone().equals(request.getPhone())
                 && staffRepository.existsByPhone(request.getPhone())) {
 
-            throw new RuntimeException("Phone number already exists");
+            throw new BusinessException("Phone number already exists");
         }
 
         Hub hub = hubRepository.findById(request.getHubId())
                 .orElseThrow(() ->
-                        new RuntimeException("Hub not found"));
+                        new ResourceNotFoundException("Hub not found"));
 
         staff.setFirstName(request.getFirstName());
         staff.setLastName(request.getLastName());

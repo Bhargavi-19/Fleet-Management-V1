@@ -1,5 +1,11 @@
 HELP.md
 target/
+
+### Local secrets - never commit these ###
+# Database password, Gmail app password, Google OAuth client secret.
+src/main/resources/application-local.properties
+application-local.properties
+*-local.properties
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/

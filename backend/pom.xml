@@ -112,6 +112,33 @@
     		<version>2.0.3</version>
 		</dependency>
 
+		<!-- Google Sign-In (SSO). Provides oauth2Login() used in SecurityConfig. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-oauth2-client</artifactId>
+		</dependency>
+
+		<!-- Apache POI - reads the .xlsx files uploaded on the Excel Upload screen. -->
+		<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi-ooxml</artifactId>
+			<version>5.3.0</version>
+		</dependency>
+
+		<!--
+			AOP support for the LoggingAspect.
+
+			Spring Boot 4 no longer ships a "spring-boot-starter-aop", so we add
+			the weaver directly. spring-aop itself is already on the classpath
+			(spring-boot-starter-security and -data-jpa both pull it in); the
+			weaver is only needed so Spring can read the @Aspect annotations.
+		-->
+		<dependency>
+			<groupId>org.aspectj</groupId>
+			<artifactId>aspectjweaver</artifactId>
+			<version>1.9.22.1</version>
+		</dependency>
+
 	</dependencies>
 
 	<build>

@@ -1,7 +1,6 @@
 package com.example.demo.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.example.demo.dto.request.ChangePasswordRequest;
@@ -13,6 +12,8 @@ import com.example.demo.dto.response.ProfileResponse;
 import com.example.demo.response.ApiResponse;
 import com.example.demo.service.CustomerService;
 
+import jakarta.validation.Valid;
+
 @RestController
 @RequestMapping("/api/customer")
 public class CustomerController {
@@ -21,36 +22,37 @@ public class CustomerController {
 	private CustomerService customerService;
 
 	@PostMapping("/register")
-	public ApiResponse<String> register(@RequestBody RegisterRequest request)
-	{
-		
+	public ApiResponse<String> register(
+	        @Valid @RequestBody RegisterRequest request) {
+
 		return customerService.register(request);
 	}
 
 	@PostMapping("/login")
-	public LoginResponse login(@RequestBody LoginRequest request) 
-	{
+	public ApiResponse<LoginResponse> login(
+	        @Valid @RequestBody LoginRequest request) {
 
 		return customerService.login(request);
 	}
-	
+
 	@GetMapping("/profile")
-	public ProfileResponse getProfile() {
+	public ApiResponse<ProfileResponse> getProfile() {
+
 	    return customerService.getProfile();
 	}
-	
+
 	@PutMapping("/profile")
 	public ApiResponse<ProfileResponse> updateProfile(
-	        @RequestBody UpdateCustomerRequest request) {
+	        @Valid @RequestBody UpdateCustomerRequest request) {
 
 	    return customerService.updateProfile(request);
 	}
-	
+
 	@PutMapping("/change-password")
 	public ApiResponse<String> changePassword(
-	        @RequestBody ChangePasswordRequest request) {
+	        @Valid @RequestBody ChangePasswordRequest request) {
 
 	    return customerService.changePassword(request);
 	}
-	
+
 }

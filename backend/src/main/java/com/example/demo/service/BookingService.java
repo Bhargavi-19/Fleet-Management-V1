@@ -11,6 +11,7 @@ import com.example.demo.dto.response.BookingResponse;
 import com.example.demo.dto.response.BookingStatsResponse;
 import com.example.demo.entity.base.Customer;
 import com.example.demo.enums.BookingStatus;
+import com.example.demo.enums.HubScope;
 import com.example.demo.response.ApiResponse;
 
 public interface BookingService {
@@ -38,10 +39,15 @@ public interface BookingService {
     ApiResponse<BookingStatsResponse> getBookingStats();
     
     
+    /**
+     * Staff bookings, scoped to which end of the rental this hub handles.
+     * @param scope PICKUP (hand-over), RETURN, or ALL. Null means ALL.
+     */
     ApiResponse<BookingPageResponse> getStaffBookings(
             int page,
             int size,
-            BookingStatus status);
+            BookingStatus status,
+            HubScope scope);
     
     ApiResponse<BookingResponse> getStaffBookingById(
             Long bookingId);

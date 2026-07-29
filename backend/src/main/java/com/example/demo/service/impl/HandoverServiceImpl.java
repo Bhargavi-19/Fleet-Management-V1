@@ -1,27 +1,37 @@
 package com.example.demo.service.impl;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.example.demo.exception.error.BusinessException;
+import com.example.demo.exception.error.ResourceNotFoundException;
+import com.example.demo.exception.error.UnauthorizedActionException;
 import com.example.demo.dto.request.AssignVehicleRequest;
 import com.example.demo.dto.response.AssignVehicleResponse;
+import com.example.demo.dto.response.InvoiceResponse;
 import com.example.demo.entity.BookingHeader;
 import com.example.demo.entity.InvoiceDetail;
 import com.example.demo.entity.InvoiceHeader;
 import com.example.demo.entity.base.Car;
+import com.example.demo.entity.base.Hub;
 import com.example.demo.entity.base.Staff;
 import com.example.demo.enums.BookingStatus;
 import com.example.demo.enums.CarStatus;
 import com.example.demo.repository.BookingDetailRepository;
 import com.example.demo.repository.BookingHeaderRepository;
 import com.example.demo.repository.CarRepository;
+import com.example.demo.repository.HubRepository;
 import com.example.demo.repository.InvoiceDetailRepository;
 import com.example.demo.repository.InvoiceHeaderRepository;
 import com.example.demo.repository.StaffRepository;
 import com.example.demo.response.ApiResponse;
+import com.example.demo.service.EmailService;
 import com.example.demo.service.HandoverService;
+import com.example.demo.service.InvoiceService;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -43,12 +53,21 @@ public class HandoverServiceImpl implements HandoverService {
     private final CarRepository carRepository;
 
     private final StaffRepository staffRepository;
+
+    private final HubRepository hubRepository;
     
     private final InvoiceHeaderRepository invoiceHeaderRepository;
 
     private final InvoiceDetailRepository invoiceDetailRepository;
 
     private final BookingDetailRepository bookingDetailRepository;
+
+    private final InvoiceService invoiceService;
+
+    private final EmailService emailService;
+
+    private static final Logger log =
+            LoggerFactory.getLogger(HandoverServiceImpl.class);
 
     // =====================================================
     // Constructor Injection
@@ -61,7 +80,10 @@ public class HandoverServiceImpl implements HandoverService {
             StaffRepository staffRepository,
             BookingDetailRepository bookingDetailRepository,
             InvoiceHeaderRepository invoiceHeaderRepository,
-            InvoiceDetailRepository invoiceDetailRepository) {
+            InvoiceDetailRepository invoiceDetailRepository,
+            HubRepository hubRepository,
+            InvoiceService invoiceService,
+            EmailService emailService) {
 
         this.bookingHeaderRepository = bookingHeaderRepository;
         this.carRepository = carRepository;
@@ -69,6 +91,9 @@ public class HandoverServiceImpl implements HandoverService {
         this.bookingDetailRepository = bookingDetailRepository;
         this.invoiceHeaderRepository = invoiceHeaderRepository;
         this.invoiceDetailRepository = invoiceDetailRepository;
+        this.hubRepository = hubRepository;
+        this.invoiceService = invoiceService;
+        this.emailService = emailService;
     }
 
     // =====================================================
@@ -94,7 +119,7 @@ public class HandoverServiceImpl implements HandoverService {
                 || "anonymousUser".equals(
                         authentication.getPrincipal())) {
 
-            throw new RuntimeException(
+            throw new UnauthorizedActionException(
                     "Staff is not authenticated");
         }
 
@@ -109,7 +134,7 @@ public class HandoverServiceImpl implements HandoverService {
                 staffRepository
                         .findByEmail(email)
                         .orElseThrow(() ->
-                                new RuntimeException(
+                                new ResourceNotFoundException(
                                         "Staff not found"));
 
         Integer staffHubId =
@@ -123,8 +148,23 @@ public class HandoverServiceImpl implements HandoverService {
                 bookingHeaderRepository
                         .findById(request.getBookingId())
                         .orElseThrow(() ->
-                                new RuntimeException(
+                                new ResourceNotFoundException(
                                         "Booking not found"));
+
+        // -------------------------------------------------
+        // Step 3b : This hub must be the PICK-UP hub
+        //
+        // A one-way rental is handed over by the pick-up hub only. The
+        // drop-off hub sees it later, in the Return module.
+        // -------------------------------------------------
+
+        if (booking.getPickupHubId() == null
+                || !booking.getPickupHubId().equals(staffHubId)) {
+
+            throw new UnauthorizedActionException(
+                    "This booking is collected from a different hub, so it "
+                    + "cannot be handed over here.");
+        }
 
         // -------------------------------------------------
         // Step 4 : Booking must be Pending
@@ -133,7 +173,7 @@ public class HandoverServiceImpl implements HandoverService {
         if (booking.getBookingStatus()
                 != BookingStatus.PENDING) {
 
-            throw new RuntimeException(
+            throw new BusinessException(
                     "Only pending bookings can be assigned");
         }
 
@@ -143,7 +183,7 @@ public class HandoverServiceImpl implements HandoverService {
 
         if (booking.getAssignedCarId() != null) {
 
-            throw new RuntimeException(
+            throw new BusinessException(
                     "Vehicle is already assigned to this booking");
         }
 
@@ -155,7 +195,7 @@ public class HandoverServiceImpl implements HandoverService {
                 carRepository
                         .findById(request.getCarId())
                         .orElseThrow(() ->
-                                new RuntimeException(
+                                new ResourceNotFoundException(
                                         "Vehicle not found"));
         
         // -------------------------------------------------
@@ -166,7 +206,7 @@ public class HandoverServiceImpl implements HandoverService {
                 .getHubId()
                 .equals(staffHubId)) {
 
-            throw new RuntimeException(
+            throw new BusinessException(
                     "Vehicle does not belong to your hub");
         }
 
@@ -176,8 +216,28 @@ public class HandoverServiceImpl implements HandoverService {
 
         if (car.getStatus() != CarStatus.AVAILABLE) {
 
-            throw new RuntimeException(
+            throw new BusinessException(
                     "Vehicle is not available");
+        }
+
+        // -------------------------------------------------
+        // Step 8b : Vehicle must match the booked category
+        //
+        // The customer paid for a specific car type, so staff cannot hand
+        // over a different one. The screen already filters the list, but
+        // this is the check that actually enforces it.
+        // -------------------------------------------------
+
+        if (booking.getCarTypeId() != null) {
+
+            if (car.getCarType() == null
+                    || !booking.getCarTypeId()
+                            .equals(car.getCarType().getCarTypeId().longValue())) {
+
+                throw new BusinessException(
+                        "This vehicle is a different category from the one booked. "
+                        + "Please choose a vehicle of the booked car type.");
+            }
         }
 
         // -------------------------------------------------
@@ -255,7 +315,7 @@ public class HandoverServiceImpl implements HandoverService {
                 || !authentication.isAuthenticated()
                 || "anonymousUser".equals(authentication.getPrincipal())) {
 
-            throw new RuntimeException("Staff is not authenticated.");
+            throw new UnauthorizedActionException("Staff is not authenticated.");
         }
 
         String email = authentication.getName();
@@ -267,7 +327,7 @@ public class HandoverServiceImpl implements HandoverService {
         Staff staff =
                 staffRepository.findByEmail(email)
                         .orElseThrow(() ->
-                                new RuntimeException("Staff not found."));
+                                new ResourceNotFoundException("Staff not found."));
 
         Integer staffHubId =
                 staff.getHub().getHubId();
@@ -280,7 +340,19 @@ public class HandoverServiceImpl implements HandoverService {
                 bookingHeaderRepository
                         .findById(request.getBookingId())
                         .orElseThrow(() ->
-                                new RuntimeException("Booking not found."));
+                                new ResourceNotFoundException("Booking not found."));
+
+        // =====================================================
+        // Step 3b : This hub must be the PICK-UP hub
+        // =====================================================
+
+        if (booking.getPickupHubId() == null
+                || !booking.getPickupHubId().equals(staffHubId)) {
+
+            throw new UnauthorizedActionException(
+                    "This booking is collected from a different hub, so it "
+                    + "cannot be handed over here.");
+        }
 
         // =====================================================
         // Step 4 : Booking Status Validation
@@ -288,7 +360,7 @@ public class HandoverServiceImpl implements HandoverService {
 
         if (booking.getBookingStatus() != BookingStatus.PENDING) {
 
-            throw new RuntimeException(
+            throw new BusinessException(
                     "Only pending bookings can be handed over.");
         }
 
@@ -298,7 +370,7 @@ public class HandoverServiceImpl implements HandoverService {
 
         if (booking.getAssignedCarId() == null) {
 
-            throw new RuntimeException(
+            throw new BusinessException(
                     "Please assign a vehicle before handover.");
         }
 
@@ -310,7 +382,7 @@ public class HandoverServiceImpl implements HandoverService {
                 carRepository
                         .findById(booking.getAssignedCarId())
                         .orElseThrow(() ->
-                                new RuntimeException(
+                                new ResourceNotFoundException(
                                         "Assigned vehicle not found."));
 
         // =====================================================
@@ -321,7 +393,7 @@ public class HandoverServiceImpl implements HandoverService {
                 .getHubId()
                 .equals(staffHubId)) {
 
-            throw new RuntimeException(
+            throw new BusinessException(
                     "Vehicle does not belong to your hub.");
         }
 
@@ -331,7 +403,7 @@ public class HandoverServiceImpl implements HandoverService {
 
         if (car.getStatus() != CarStatus.AVAILABLE) {
 
-            throw new RuntimeException(
+            throw new BusinessException(
                     "Vehicle is not available for handover.");
         }
         
@@ -341,7 +413,7 @@ public class HandoverServiceImpl implements HandoverService {
         invoiceHeaderRepository
              .findByBookingId(booking.getBookingId())
              .ifPresent(existing -> {
-                 throw new RuntimeException(
+                 throw new BusinessException(
                          "Invoice already exists for this booking.");
              });
 
@@ -392,6 +464,13 @@ public class HandoverServiceImpl implements HandoverService {
         invoice.setPhone(booking.getPhone());
         invoice.setDrivingLicenseNo(booking.getDrivingLicenseNo());
         invoice.setPassportNo(booking.getPassportNo());
+
+        // Address snapshot (BRD: Invoice Header Table)
+        invoice.setAddressLine1(booking.getAddressLine1());
+        invoice.setAddressLine2(booking.getAddressLine2());
+        invoice.setCityId(booking.getCityId());
+        invoice.setStateId(booking.getStateId());
+        invoice.setPincode(booking.getPincode());
 
         // Vehicle Snapshot
         invoice.setCarId(car.getCarId());
@@ -497,7 +576,7 @@ public class HandoverServiceImpl implements HandoverService {
                 || !authentication.isAuthenticated()
                 || "anonymousUser".equals(authentication.getPrincipal())) {
 
-            throw new RuntimeException(
+            throw new UnauthorizedActionException(
                     "Staff is not authenticated.");
         }
 
@@ -512,7 +591,7 @@ public class HandoverServiceImpl implements HandoverService {
                 staffRepository
                         .findByEmail(email)
                         .orElseThrow(() ->
-                                new RuntimeException(
+                                new ResourceNotFoundException(
                                         "Staff not found."));
 
         Integer staffHubId =
@@ -526,7 +605,7 @@ public class HandoverServiceImpl implements HandoverService {
                 bookingHeaderRepository
                         .findById(request.getBookingId())
                         .orElseThrow(() ->
-                                new RuntimeException(
+                                new ResourceNotFoundException(
                                         "Booking not found."));
 
         // =====================================================
@@ -535,7 +614,7 @@ public class HandoverServiceImpl implements HandoverService {
 
         if (booking.getBookingStatus() != BookingStatus.CONFIRMED) {
 
-            throw new RuntimeException(
+            throw new BusinessException(
                     "Only confirmed bookings can be returned.");
         }
 
@@ -545,7 +624,7 @@ public class HandoverServiceImpl implements HandoverService {
 
         if (booking.getAssignedCarId() == null) {
 
-            throw new RuntimeException(
+            throw new BusinessException(
                     "No vehicle is assigned to this booking.");
         }
 
@@ -557,19 +636,24 @@ public class HandoverServiceImpl implements HandoverService {
                 carRepository
                         .findById(booking.getAssignedCarId())
                         .orElseThrow(() ->
-                                new RuntimeException(
+                                new ResourceNotFoundException(
                                         "Assigned vehicle not found."));
 
         // =====================================================
         // Step 7 : Hub Validation
+        //
+        // Checked against the booking's DROP-OFF hub, not the car's hub.
+        // On a one-way rental (BOM -> Nagpur) the car still belongs to BOM
+        // at this moment, so testing the car's hub would make it impossible
+        // to ever accept the return at Nagpur.
         // =====================================================
 
-        if (!car.getHub()
-                .getHubId()
-                .equals(staffHubId)) {
+        if (booking.getDropoffHubId() == null
+                || !booking.getDropoffHubId().equals(staffHubId)) {
 
-            throw new RuntimeException(
-                    "Vehicle does not belong to your hub.");
+            throw new UnauthorizedActionException(
+                    "This booking is due back at a different hub, so it "
+                    + "cannot be returned here.");
         }
 
         // =====================================================
@@ -578,7 +662,7 @@ public class HandoverServiceImpl implements HandoverService {
 
         if (car.getStatus() != CarStatus.RENTED) {
 
-            throw new RuntimeException(
+            throw new BusinessException(
                     "Vehicle is not currently rented.");
         }
 
@@ -590,7 +674,7 @@ public class HandoverServiceImpl implements HandoverService {
                 invoiceHeaderRepository
                         .findByBookingId(booking.getBookingId())
                         .orElseThrow(() ->
-                                new RuntimeException(
+                                new ResourceNotFoundException(
                                         "Invoice not found."));
 
         // =====================================================
@@ -609,8 +693,14 @@ public class HandoverServiceImpl implements HandoverService {
         bookingHeaderRepository.save(booking);
 
         // =====================================================
-        // Step 11 : Update Invoice
+        // Step 11 : Finalise the Invoice
+        //
+        // The invoice row was created at hand-over. The vehicle is only now
+        // back, so this is the point at which the invoice is actually
+        // "raised": it gets its number, its date and the return details.
         // =====================================================
+
+        LocalDateTime now = LocalDateTime.now();
 
         invoice.setEndDate(
                 booking.getEndDate());
@@ -621,24 +711,75 @@ public class HandoverServiceImpl implements HandoverService {
         invoice.setFuelCharges(
                 request.getFuelCharges());
 
+        invoice.setReturnDate(now);
+        invoice.setInvoiceDate(now);
+
+        // Only number it once, so a corrected return never renumbers it.
+        if (invoice.getInvoiceNo() == null) {
+            invoice.setInvoiceNo(buildInvoiceNumber(invoice.getInvoiceId(), now));
+        }
+
         invoiceHeaderRepository.save(invoice);
 
         // =====================================================
         // Step 12 : Update Vehicle
+        //
+        // The car is now standing at the drop-off hub, so move it there.
+        // Without this a one-way rental would leave the vehicle listed at
+        // its original hub and it could never be hired out again.
         // =====================================================
 
         car.setStatus(CarStatus.AVAILABLE);
 
+        if (!car.getHub().getHubId().equals(staffHubId)) {
+
+            Hub dropoffHub = hubRepository
+                    .findById(staffHubId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Hub not found"));
+
+            car.setHub(dropoffHub);
+
+            log.info("Vehicle {} moved from hub {} to hub {} on return of booking {}",
+                    car.getRegistrationNo(), booking.getPickupHubId(),
+                    staffHubId, booking.getBookingId());
+        }
+
         carRepository.save(car);
 
         // =====================================================
-        // Step 13 : Return Success Response
+        // Step 13 : Email the invoice
+        //
+        // Sent on a background thread and it never throws, so a mail failure
+        // is logged but cannot break the return the staff member just made.
+        // =====================================================
+
+        try {
+            InvoiceResponse invoiceResponse =
+                    invoiceService.loadInvoiceForBooking(booking.getBookingId());
+
+            emailService.sendInvoice(invoiceResponse);
+
+        } catch (Exception e) {
+            log.error("Could not queue the invoice email for booking {}: {}",
+                    booking.getBookingId(), e.getMessage());
+        }
+
+        // =====================================================
+        // Step 14 : Return Success Response
         // =====================================================
 
         return new ApiResponse<>(
                 true,
                 "Vehicle returned successfully.",
-                "Booking completed successfully.");
+                "Booking completed and invoice generated.");
+    }
+
+    /**
+     * Builds the printed invoice number, e.g. INV-2026-000042.
+     * The invoice id keeps it unique; the year just makes it readable.
+     */
+    private String buildInvoiceNumber(Long invoiceId, LocalDateTime when) {
+        return String.format("INV-%d-%06d", when.getYear(), invoiceId);
     }
 
 }

@@ -1,7 +1,10 @@
 package com.example.demo.service.impl;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -12,22 +15,35 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.example.demo.exception.error.BusinessException;
+import com.example.demo.exception.error.ResourceNotFoundException;
+import com.example.demo.exception.error.UnauthorizedActionException;
 import com.example.demo.dto.request.AddonRequest;
 import com.example.demo.dto.request.BookingRequest;
 import com.example.demo.dto.request.GuestBookingRequest;
 import com.example.demo.dto.request.UpdateBookingRequest;
 import com.example.demo.dto.request.UpdateBookingStatusRequest;
+import com.example.demo.dto.response.BookingAddonResponse;
 import com.example.demo.dto.response.BookingPageResponse;
 import com.example.demo.dto.response.BookingResponse;
 import com.example.demo.dto.response.BookingStatsResponse;
 import com.example.demo.entity.BookingDetail;
 import com.example.demo.entity.BookingHeader;
+import com.example.demo.entity.base.Addon;
+import com.example.demo.entity.base.CarType;
+import com.example.demo.entity.base.City;
 import com.example.demo.entity.base.Customer;
 import com.example.demo.entity.base.Staff;
+import com.example.demo.entity.base.State;
 import com.example.demo.enums.BookingSource;
 import com.example.demo.enums.BookingStatus;
+import com.example.demo.enums.HubScope;
 import com.example.demo.repository.BookingDetailRepository;
 import com.example.demo.repository.BookingHeaderRepository;
+import com.example.demo.repository.AddonRepository;
+import com.example.demo.repository.CarTypeRepository;
+import com.example.demo.repository.CityRepository;
+import com.example.demo.repository.StateRepository;
 import com.example.demo.repository.CustomerRepository;
 import com.example.demo.repository.StaffRepository;
 import com.example.demo.response.ApiResponse;
@@ -48,18 +64,30 @@ public class BookingServiceImpl implements BookingService {
     private final CustomerRepository customerRepository;
     private final EmailService emailService;
     private final StaffRepository staffRepository;
+    private final CarTypeRepository carTypeRepository;
+    private final AddonRepository addonRepository;
+    private final CityRepository cityRepository;
+    private final StateRepository stateRepository;
 
     public BookingServiceImpl(
             BookingHeaderRepository bookingHeaderRepository,
             BookingDetailRepository bookingDetailRepository,
             CustomerRepository customerRepository,
             StaffRepository staffRepository,
+            CarTypeRepository carTypeRepository,
+            AddonRepository addonRepository,
+            CityRepository cityRepository,
+            StateRepository stateRepository,
             EmailService emailService) {
 
         this.bookingHeaderRepository = bookingHeaderRepository;
         this.bookingDetailRepository = bookingDetailRepository;
         this.customerRepository = customerRepository;
         this.staffRepository = staffRepository;
+        this.carTypeRepository = carTypeRepository;
+        this.addonRepository = addonRepository;
+        this.cityRepository = cityRepository;
+        this.stateRepository = stateRepository;
         this.emailService = emailService;
     }
     
@@ -77,7 +105,7 @@ public class BookingServiceImpl implements BookingService {
                 || !authentication.isAuthenticated()
                 || "anonymousUser".equals(authentication.getPrincipal())) {
 
-            throw new RuntimeException(
+            throw new UnauthorizedActionException(
                     "Customer is not authenticated");
         }
 
@@ -86,7 +114,7 @@ public class BookingServiceImpl implements BookingService {
         Customer customer = customerRepository
                 .findByEmail(email)
                 .orElseThrow(() ->
-                        new RuntimeException(
+                        new ResourceNotFoundException(
                                 "Customer not found"));
 
         BookingResponse response =
@@ -102,9 +130,195 @@ public class BookingServiceImpl implements BookingService {
     }
 
 
+    /**
+     * Dates a booking must satisfy, whether it is being created or modified.
+     *
+     * The DTO carries @FutureOrPresent, but this runs too so the rule still
+     * holds for the guest path and any future caller.
+     */
+    private void validateBookingDates(LocalDate startDate, LocalDate endDate) {
+
+        if (startDate == null || endDate == null) {
+            throw new BusinessException("Both the pick-up and return dates are required");
+        }
+        if (startDate.isBefore(LocalDate.now())) {
+            throw new BusinessException("The pick-up date cannot be in the past");
+        }
+        if (!endDate.isAfter(startDate)) {
+            throw new BusinessException("The return date must be after the pick-up date");
+        }
+    }
+
+    /** GST applied to the vehicle and add-on subtotal. */
+    private static final BigDecimal TAX_RATE = new BigDecimal("0.18");
+
+    /** Null-safe Double -> BigDecimal, so a missing rate counts as zero. */
+    private BigDecimal toAmount(Double value) {
+        return value == null
+                ? BigDecimal.ZERO
+                : BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Prices the rental using the best combination of monthly, weekly and
+     * daily rates - the same tiering the booking screen shows the customer.
+     *
+     * 40 days = 1 month + 1 week + 3 days.
+     */
+    private BigDecimal calculateVehicleAmount(
+            BigDecimal daily,
+            BigDecimal weekly,
+            BigDecimal monthly,
+            int days) {
+
+        int months = days / 30;
+        int remainder = days % 30;
+        int weeks = remainder / 7;
+        int extraDays = remainder % 7;
+
+        return monthly.multiply(BigDecimal.valueOf(months))
+                .add(weekly.multiply(BigDecimal.valueOf(weeks)))
+                .add(daily.multiply(BigDecimal.valueOf(extraDays)))
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Totals the chosen add-ons using the price held in the database, never
+     * the price sent by the browser.
+     */
+    private BigDecimal calculateAddonAmount(List<AddonRequest> addons, int days) {
+
+        if (addons == null || addons.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal total = BigDecimal.ZERO;
+
+        for (AddonRequest requested : addons) {
+
+            if (requested.getAddonId() == null) {
+                continue;
+            }
+
+            Addon addon = addonRepository
+                    .findById(requested.getAddonId().intValue())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Add-on no longer available: " + requested.getAddonName()));
+
+            total = total.add(
+                    toAmount(addon.getPricePerDay())
+                            .multiply(BigDecimal.valueOf(days)));
+        }
+
+        return total.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Copies the details given at booking time onto the customer's profile:
+     * licence number, passport number and the billing address.
+     *
+     * Only fills a value in when the customer supplied one, so an empty field
+     * on the booking form never wipes something already on the profile.
+     */
+    private void saveDocumentsOnProfile(
+            Customer customer,
+            BookingRequest request) {
+
+        boolean changed = false;
+
+        String licence = request.getDrivingLicenseNo();
+        if (licence != null && !licence.isBlank()
+                && !licence.equals(customer.getDrivingLicenseNo())) {
+
+            customer.setDrivingLicenseNo(licence.trim());
+            changed = true;
+        }
+
+        String passport = request.getPassportNo();
+        if (passport != null && !passport.isBlank()
+                && !passport.equals(customer.getPassportNo())) {
+
+            customer.setPassportNo(passport.trim());
+            changed = true;
+        }
+
+        // ---- Billing address -------------------------------------------
+        // Same idea as the documents above: whatever the customer typed on
+        // the booking form becomes their saved address, so the next booking
+        // pre-fills it and the invoice always has something to print.
+        //
+        // Blank values are ignored rather than written. If they were written
+        // we would wipe a good address every time the form sent an empty
+        // field, which is the opposite of what the customer expects.
+
+        String line1 = request.getAddressLine1();
+        if (line1 != null && !line1.isBlank()
+                && !line1.trim().equals(customer.getAddressLine1())) {
+
+            customer.setAddressLine1(line1.trim());
+            changed = true;
+        }
+
+        String line2 = request.getAddressLine2();
+        if (line2 != null && !line2.isBlank()
+                && !line2.trim().equals(customer.getAddressLine2())) {
+
+            customer.setAddressLine2(line2.trim());
+            changed = true;
+        }
+
+        String pincode = request.getPincode();
+        if (pincode != null && !pincode.isBlank()
+                && !pincode.trim().equals(customer.getPincode())) {
+
+            customer.setPincode(pincode.trim());
+            changed = true;
+        }
+
+        // State and city are real rows, so look them up rather than trusting
+        // the id blindly. An id that does not exist is simply skipped: a bad
+        // address must never stop somebody renting a car.
+        Integer stateId = request.getStateId();
+        if (stateId != null
+                && (customer.getState() == null
+                    || !stateId.equals(customer.getState().getStateId()))) {
+
+            State state = stateRepository.findById(stateId).orElse(null);
+            if (state != null) {
+                customer.setState(state);
+                changed = true;
+            }
+        }
+
+        Integer cityId = request.getCityId();
+        if (cityId != null
+                && (customer.getCity() == null
+                    || !cityId.equals(customer.getCity().getCityId()))) {
+
+            City city = cityRepository.findById(cityId).orElse(null);
+            if (city != null) {
+                customer.setCity(city);
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            customerRepository.save(customer);
+        }
+    }
+
     private BookingResponse saveBooking(
             Customer customer,
             BookingRequest request) {
+
+        validateBookingDates(request.getStartDate(), request.getEndDate());
+
+        // If the customer typed a licence number, passport number or address
+        // on the booking form, remember it on their profile so they never
+        // retype it. This reuses the same Customer record the Update Profile
+        // API writes to, and it has to happen BEFORE the snapshot below is
+        // taken - the snapshot reads straight off the Customer.
+        saveDocumentsOnProfile(customer, request);
 
         BookingHeader booking = new BookingHeader();
 
@@ -129,16 +343,32 @@ public class BookingServiceImpl implements BookingService {
         booking.setAddressLine2(
                 customer.getAddressLine2());
 
-        booking.setCityId(
-                customer.getCity().getCityId());
+        booking.setDateOfBirth(
+                customer.getDateOfBirth());
 
-        booking.setStateId(
-                customer.getState().getStateId());
+        booking.setGender(
+                customer.getGender());
+
+        booking.setNationality(
+                customer.getNationality());
+
+        // City / State are optional on the customer record, so only
+        // copy them across when they are actually filled in.
+        if (customer.getCity() != null) {
+            booking.setCityId(
+                    customer.getCity().getCityId());
+        }
+
+        if (customer.getState() != null) {
+            booking.setStateId(
+                    customer.getState().getStateId());
+        }
 
         booking.setPincode(
                 customer.getPincode());
 
         // Booking information
+        // carId stays empty - staff pick the actual vehicle at hand-over.
         booking.setCarId(request.getCarId());
         booking.setCarTypeId(request.getCarTypeId());
 
@@ -201,58 +431,19 @@ public class BookingServiceImpl implements BookingService {
             bookingDetailRepository.saveAll(details);
         }
 
-        // Response
-        BookingResponse response = new BookingResponse();
-
-        response.setBookingId(savedBooking.getBookingId());
-        response.setCustomerId(savedBooking.getCustomerId());
-
-        String customerName = savedBooking.getFirstName();
-
-        if (savedBooking.getLastName() != null) {
-            customerName += " " + savedBooking.getLastName();
-        }
-
-        response.setCustomerName(customerName);
-
-        response.setEmail(savedBooking.getEmail());
-        response.setCarId(savedBooking.getCarId());
-
-        response.setStartDate(savedBooking.getStartDate());
-        response.setEndDate(savedBooking.getEndDate());
-
-        response.setPickupHubName(
-                savedBooking.getPickupHubName());
-
-        response.setDropoffHubName(
-                savedBooking.getDropoffHubName());
-
-        response.setDuration(savedBooking.getDuration());
-
-        response.setVehicleAmount(
-                savedBooking.getVehicleAmount());
-
-        response.setAddonAmount(
-                savedBooking.getAddonAmount());
-
-        response.setTaxAmount(
-                savedBooking.getTaxAmount());
-
-        response.setGrandTotal(
-                savedBooking.getGrandTotal());
-
-        response.setBookingStatus(
-                savedBooking.getBookingStatus());
-
-        return response;
+        return mapToBookingResponse(savedBooking);
     }
-   
-    
+
+
     private BookingResponse saveGuestBooking(
             GuestBookingRequest request) {
 
         BookingRequest bookingRequest =
                 request.getBooking();
+
+        validateBookingDates(
+                bookingRequest.getStartDate(),
+                bookingRequest.getEndDate());
 
         BookingHeader booking =
                 new BookingHeader();
@@ -406,66 +597,7 @@ public class BookingServiceImpl implements BookingService {
             bookingDetailRepository.saveAll(details);
         }
 
-        // --------------------------------
-        // Response
-        // --------------------------------
-
-        BookingResponse response =
-                new BookingResponse();
-
-        response.setBookingId(
-                savedBooking.getBookingId());
-
-        // Will be null for guest
-        response.setCustomerId(null);
-
-        String customerName =
-                savedBooking.getFirstName();
-
-        if (savedBooking.getLastName() != null) {
-            customerName +=
-                    " " + savedBooking.getLastName();
-        }
-
-        response.setCustomerName(customerName);
-
-        response.setEmail(
-                savedBooking.getEmail());
-
-        response.setCarId(
-                savedBooking.getCarId());
-
-        response.setStartDate(
-                savedBooking.getStartDate());
-
-        response.setEndDate(
-                savedBooking.getEndDate());
-
-        response.setPickupHubName(
-                savedBooking.getPickupHubName());
-
-        response.setDropoffHubName(
-                savedBooking.getDropoffHubName());
-
-        response.setDuration(
-                savedBooking.getDuration());
-
-        response.setVehicleAmount(
-                savedBooking.getVehicleAmount());
-
-        response.setAddonAmount(
-                savedBooking.getAddonAmount());
-
-        response.setTaxAmount(
-                savedBooking.getTaxAmount());
-
-        response.setGrandTotal(
-                savedBooking.getGrandTotal());
-
-        response.setBookingStatus(
-                savedBooking.getBookingStatus());
-
-        return response;
+        return mapToBookingResponse(savedBooking);
     }
     
     
@@ -487,15 +619,29 @@ public class BookingServiceImpl implements BookingService {
     }
 
     
+    /**
+     * Single place that converts a booking entity into the API response.
+     *
+     * Used by every read and write method so the customer screens and the
+     * staff screens always receive exactly the same shape.
+     */
     private BookingResponse mapToBookingResponse(
             BookingHeader booking) {
 
         BookingResponse response =
                 new BookingResponse();
 
+        // ---------- Booking ----------
         response.setBookingId(
                 booking.getBookingId());
 
+        response.setBookingStatus(
+                booking.getBookingStatus());
+
+        response.setBookingDate(
+                booking.getDate());
+
+        // ---------- Customer ----------
         response.setCustomerId(
                 booking.getCustomerId());
 
@@ -514,9 +660,51 @@ public class BookingServiceImpl implements BookingService {
         response.setEmail(
                 booking.getEmail());
 
+        response.setPhone(
+                booking.getPhone());
+
+        response.setDrivingLicenseNo(
+                booking.getDrivingLicenseNo());
+
+        // Structured address, with the city and state resolved to names so
+        // every screen can render it the same way.
+        response.setAddressLine1(booking.getAddressLine1());
+        response.setAddressLine2(booking.getAddressLine2());
+        response.setPincode(booking.getPincode());
+        response.setCityId(booking.getCityId());
+        response.setStateId(booking.getStateId());
+
+        if (booking.getCityId() != null) {
+            cityRepository.findById(booking.getCityId())
+                    .ifPresent(c -> response.setCityName(c.getCityName()));
+        }
+        if (booking.getStateId() != null) {
+            stateRepository.findById(booking.getStateId())
+                    .ifPresent(st -> response.setStateName(st.getStateName()));
+        }
+
+        // ---------- Vehicle ----------
         response.setCarId(
                 booking.getCarId());
 
+        response.setCarTypeId(
+                booking.getCarTypeId());
+
+        // Show the customer the category they actually booked, rather than a
+        // placeholder, on the dashboard's Vehicle Information panel.
+        if (booking.getCarTypeId() != null) {
+            carTypeRepository
+                    .findById(booking.getCarTypeId().intValue())
+                    .ifPresent(carType -> {
+                        response.setCarTypeName(carType.getCarType());
+                        response.setCarTypeImageUrl(carType.getImageUrl());
+                        if (carType.getCarClass() != null) {
+                            response.setCarClass(carType.getCarClass().name());
+                        }
+                    });
+        }
+
+        // ---------- Hubs ----------
         response.setPickupHubId(
                 booking.getPickupHubId());
 
@@ -529,6 +717,7 @@ public class BookingServiceImpl implements BookingService {
         response.setDropoffHubName(
                 booking.getDropoffHubName());
 
+        // ---------- Dates ----------
         response.setStartDate(
                 booking.getStartDate());
 
@@ -538,6 +727,17 @@ public class BookingServiceImpl implements BookingService {
         response.setDuration(
                 booking.getDuration());
 
+        // ---------- Rates ----------
+        response.setDailyRate(
+                booking.getDailyRate());
+
+        response.setWeeklyRate(
+                booking.getWeeklyRate());
+
+        response.setMonthlyRate(
+                booking.getMonthlyRate());
+
+        // ---------- Amounts ----------
         response.setVehicleAmount(
                 booking.getVehicleAmount());
 
@@ -550,8 +750,39 @@ public class BookingServiceImpl implements BookingService {
         response.setGrandTotal(
                 booking.getGrandTotal());
 
-        response.setBookingStatus(
-                booking.getBookingStatus());
+        // ---------- Assigned vehicle ----------
+        response.setAssignedCarId(
+                booking.getAssignedCarId());
+
+        response.setAssignedCarRegistrationNo(
+                booking.getAssignedCarRegistrationNo());
+
+        response.setAssignedCarBrandName(
+                booking.getAssignedCarBrandName());
+
+        response.setAssignedCarModelName(
+                booking.getAssignedCarModelName());
+
+        // ---------- Hand-over / return ----------
+        response.setHandoverDate(
+                booking.getHandoverDate());
+
+        response.setFuelLevelOut(
+                booking.getFuelLevelOut());
+
+        response.setFuelLevelIn(
+                booking.getFuelLevelIn());
+
+        response.setFuelCharges(
+                booking.getFuelCharges());
+
+        // ---------- Add-ons ----------
+        response.setAddons(
+                bookingDetailRepository
+                        .findByBookingId(booking.getBookingId())
+                        .stream()
+                        .map(BookingAddonResponse::fromEntity)
+                        .toList());
 
         return response;
     }
@@ -569,12 +800,12 @@ public class BookingServiceImpl implements BookingService {
         // -----------------------------
 
         if (page < 0) {
-            throw new RuntimeException(
+            throw new BusinessException(
                     "Page number cannot be negative");
         }
 
         if (size <= 0) {
-            throw new RuntimeException(
+            throw new BusinessException(
                     "Page size must be greater than 0");
         }
 
@@ -597,7 +828,7 @@ public class BookingServiceImpl implements BookingService {
                 || "anonymousUser".equals(
                         authentication.getPrincipal())) {
 
-            throw new RuntimeException(
+            throw new UnauthorizedActionException(
                     "User is not authenticated");
         }
 
@@ -612,7 +843,7 @@ public class BookingServiceImpl implements BookingService {
                 customerRepository
                         .findByEmail(email)
                         .orElseThrow(() ->
-                                new RuntimeException(
+                                new ResourceNotFoundException(
                                         "Customer not found"));
 
         // -----------------------------
@@ -711,7 +942,7 @@ public class BookingServiceImpl implements BookingService {
                 || "anonymousUser".equals(
                         authentication.getPrincipal())) {
 
-            throw new RuntimeException(
+            throw new UnauthorizedActionException(
                     "User is not authenticated");
         }
 
@@ -722,7 +953,7 @@ public class BookingServiceImpl implements BookingService {
                 customerRepository
                         .findByEmail(email)
                         .orElseThrow(() ->
-                                new RuntimeException(
+                                new ResourceNotFoundException(
                                         "Customer not found"));
 
         // Find booking
@@ -730,7 +961,7 @@ public class BookingServiceImpl implements BookingService {
                 bookingHeaderRepository
                         .findById(bookingId)
                         .orElseThrow(() ->
-                                new RuntimeException(
+                                new ResourceNotFoundException(
                                         "Booking not found"));
 
         // Ownership check
@@ -738,7 +969,7 @@ public class BookingServiceImpl implements BookingService {
                 || !booking.getCustomerId()
                         .equals(customer.getCustomerId())) {
 
-            throw new RuntimeException(
+            throw new UnauthorizedActionException(
                     "You are not authorized to access this booking");
         }
 
@@ -772,7 +1003,7 @@ public class BookingServiceImpl implements BookingService {
                 || "anonymousUser".equals(
                         authentication.getPrincipal())) {
 
-            throw new RuntimeException(
+            throw new UnauthorizedActionException(
                     "User is not authenticated");
         }
 
@@ -782,7 +1013,7 @@ public class BookingServiceImpl implements BookingService {
                 customerRepository
                         .findByEmail(email)
                         .orElseThrow(() ->
-                                new RuntimeException(
+                                new ResourceNotFoundException(
                                         "Customer not found"));
 
         // --------------------------------
@@ -793,7 +1024,7 @@ public class BookingServiceImpl implements BookingService {
                 bookingHeaderRepository
                         .findById(bookingId)
                         .orElseThrow(() ->
-                                new RuntimeException(
+                                new ResourceNotFoundException(
                                         "Booking not found"));
 
         // --------------------------------
@@ -804,7 +1035,7 @@ public class BookingServiceImpl implements BookingService {
                 || !booking.getCustomerId()
                         .equals(customer.getCustomerId())) {
 
-            throw new RuntimeException(
+            throw new UnauthorizedActionException(
                     "You are not authorized to modify this booking");
         }
 
@@ -815,26 +1046,96 @@ public class BookingServiceImpl implements BookingService {
         if (booking.getBookingStatus()
                 == BookingStatus.CANCELLED) {
 
-            throw new RuntimeException(
+            throw new BusinessException(
                     "Cancelled booking cannot be modified");
         }
 
         if (booking.getBookingStatus()
                 == BookingStatus.COMPLETED) {
 
-            throw new RuntimeException(
+            throw new BusinessException(
                     "Completed booking cannot be modified");
         }
+
+        // Once staff have allocated a vehicle and handed it over, the rental
+        // is under way and the customer can no longer change its terms.
+        if (booking.getAssignedCarId() != null
+                || booking.getHandoverDate() != null) {
+
+            throw new BusinessException(
+                    "This booking cannot be changed because the vehicle has "
+                    + "already been allocated. Please contact the hub.");
+        }
+
+        // --------------------------------
+        // Date validation
+        // --------------------------------
+
+        LocalDate startDate = request.getStartDate();
+        LocalDate endDate = request.getEndDate();
+
+        if (!endDate.isAfter(startDate)) {
+            throw new BusinessException(
+                    "The return date must be after the pick-up date");
+        }
+
+        if (startDate.isBefore(LocalDate.now())) {
+            throw new BusinessException(
+                    "The pick-up date cannot be in the past");
+        }
+
+        // Duration is derived from the dates rather than trusted from the
+        // browser, so the two can never disagree.
+        int duration = (int) ChronoUnit.DAYS.between(startDate, endDate);
+        if (duration < 1) {
+            duration = 1;
+        }
+
+        // --------------------------------
+        // Vehicle type + repricing
+        //
+        // Every amount is recalculated here from the rate card in the
+        // database. Whatever totals the browser sent are ignored, so a
+        // modified booking can never be under-priced.
+        // --------------------------------
+
+        CarType carType = carTypeRepository
+                .findById(request.getCarTypeId().intValue())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "The selected vehicle type is no longer available"));
+
+        if (carType.getHub() == null
+                || !carType.getHub().getHubId().equals(request.getPickupHubId())) {
+
+            throw new BusinessException(
+                    "That vehicle type is not offered at the selected pick-up hub");
+        }
+
+        BigDecimal dailyRate = toAmount(carType.getDailyRate());
+        BigDecimal weeklyRate = toAmount(carType.getWeeklyRate());
+        BigDecimal monthlyRate = toAmount(carType.getMonthlyRate());
+
+        BigDecimal vehicleAmount =
+                calculateVehicleAmount(dailyRate, weeklyRate, monthlyRate, duration);
+
+        BigDecimal addonAmount =
+                calculateAddonAmount(request.getAddons(), duration);
+
+        BigDecimal taxAmount = vehicleAmount.add(addonAmount)
+                .multiply(TAX_RATE)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal grandTotal = vehicleAmount.add(addonAmount).add(taxAmount);
 
         // --------------------------------
         // Update booking
         // --------------------------------
 
-        booking.setStartDate(
-                request.getStartDate());
+        booking.setCarTypeId(request.getCarTypeId());
 
-        booking.setEndDate(
-                request.getEndDate());
+        booking.setStartDate(startDate);
+        booking.setEndDate(endDate);
+        booking.setDuration(duration);
 
         booking.setPickupHubId(
                 request.getPickupHubId());
@@ -848,21 +1149,15 @@ public class BookingServiceImpl implements BookingService {
         booking.setDropoffHubName(
                 request.getDropoffHubName());
 
-        booking.setDuration(
-                request.getDuration());
+        // Rate snapshot, refreshed for the newly chosen car type
+        booking.setDailyRate(dailyRate);
+        booking.setWeeklyRate(weeklyRate);
+        booking.setMonthlyRate(monthlyRate);
 
-        // Frontend-calculated values
-        booking.setVehicleAmount(
-                request.getVehicleAmount());
-
-        booking.setAddonAmount(
-                request.getAddonAmount());
-
-        booking.setTaxAmount(
-                request.getTaxAmount());
-
-        booking.setGrandTotal(
-                request.getGrandTotal());
+        booking.setVehicleAmount(vehicleAmount);
+        booking.setAddonAmount(addonAmount);
+        booking.setTaxAmount(taxAmount);
+        booking.setGrandTotal(grandTotal);
 
         BookingHeader savedBooking =
                 bookingHeaderRepository.save(booking);
@@ -871,6 +1166,9 @@ public class BookingServiceImpl implements BookingService {
         // Update addons
         // --------------------------------
 
+        // Replace the add-on lines. Names and prices are taken from the
+        // database so the stored lines always agree with the recalculated
+        // addonAmount above.
         bookingDetailRepository
                 .deleteByBookingId(bookingId);
 
@@ -880,23 +1178,31 @@ public class BookingServiceImpl implements BookingService {
             List<BookingDetail> details =
                     new ArrayList<>();
 
-            for (AddonRequest addon :
-                    request.getAddons()) {
+            for (AddonRequest requested : request.getAddons()) {
 
-                BookingDetail detail =
-                        new BookingDetail();
+                if (requested.getAddonId() == null) {
+                    continue;
+                }
+
+                Addon addon = addonRepository
+                        .findById(requested.getAddonId().intValue())
+                        .orElseThrow(() -> new ResourceNotFoundException(
+                                "Add-on no longer available"));
+
+                BookingDetail detail = new BookingDetail();
 
                 detail.setBookingId(
                         savedBooking.getBookingId());
 
                 detail.setAddonId(
-                        addon.getAddonId());
+                        requested.getAddonId());
 
                 detail.setAddonName(
                         addon.getAddonName());
 
                 detail.setAddonPrice(
-                        addon.getAddonPrice());
+                        toAmount(addon.getPricePerDay())
+                                .multiply(BigDecimal.valueOf(duration)));
 
                 detail.setBookingSource(
                         BookingSource.ONLINE);
@@ -936,7 +1242,7 @@ public class BookingServiceImpl implements BookingService {
                 || "anonymousUser".equals(
                         authentication.getPrincipal())) {
 
-            throw new RuntimeException(
+            throw new UnauthorizedActionException(
                     "User is not authenticated");
         }
 
@@ -950,7 +1256,7 @@ public class BookingServiceImpl implements BookingService {
                 customerRepository
                         .findByEmail(email)
                         .orElseThrow(() ->
-                                new RuntimeException(
+                                new ResourceNotFoundException(
                                         "Customer not found"));
 
         // --------------------------------
@@ -961,7 +1267,7 @@ public class BookingServiceImpl implements BookingService {
                 bookingHeaderRepository
                         .findById(bookingId)
                         .orElseThrow(() ->
-                                new RuntimeException(
+                                new ResourceNotFoundException(
                                         "Booking not found"));
 
         // --------------------------------
@@ -972,7 +1278,7 @@ public class BookingServiceImpl implements BookingService {
                 || !booking.getCustomerId()
                         .equals(customer.getCustomerId())) {
 
-            throw new RuntimeException(
+            throw new UnauthorizedActionException(
                     "You are not authorized to cancel this booking");
         }
 
@@ -983,14 +1289,14 @@ public class BookingServiceImpl implements BookingService {
         if (booking.getBookingStatus()
                 == BookingStatus.CANCELLED) {
 
-            throw new RuntimeException(
+            throw new BusinessException(
                     "Booking is already cancelled");
         }
 
         if (booking.getBookingStatus()
                 == BookingStatus.COMPLETED) {
 
-            throw new RuntimeException(
+            throw new BusinessException(
                     "Completed booking cannot be cancelled");
         }
 
@@ -1032,7 +1338,7 @@ public class BookingServiceImpl implements BookingService {
                 || "anonymousUser".equals(
                         authentication.getPrincipal())) {
 
-            throw new RuntimeException(
+            throw new UnauthorizedActionException(
                     "User is not authenticated");
         }
 
@@ -1047,7 +1353,7 @@ public class BookingServiceImpl implements BookingService {
                 customerRepository
                         .findByEmail(email)
                         .orElseThrow(() ->
-                                new RuntimeException(
+                                new ResourceNotFoundException(
                                         "Customer not found"));
 
         String customerId =
@@ -1136,7 +1442,8 @@ public class BookingServiceImpl implements BookingService {
  
 	@Override
 	@Transactional(readOnly = true)
-	public ApiResponse<BookingPageResponse> getStaffBookings(int page, int size, BookingStatus status) {
+	public ApiResponse<BookingPageResponse> getStaffBookings(
+	        int page, int size, BookingStatus status, HubScope scope) {
 		
 
 	    // --------------------------------
@@ -1144,12 +1451,12 @@ public class BookingServiceImpl implements BookingService {
 	    // --------------------------------
 
 	    if (page < 0) {
-	        throw new RuntimeException(
+	        throw new BusinessException(
 	                "Page number cannot be negative");
 	    }
 
 	    if (size <= 0) {
-	        throw new RuntimeException(
+	        throw new BusinessException(
 	                "Page size must be greater than 0");
 	    }
 
@@ -1170,7 +1477,7 @@ public class BookingServiceImpl implements BookingService {
 	            || !authentication.isAuthenticated()
 	            || "anonymousUser".equals(authentication.getPrincipal())) {
 
-	        throw new RuntimeException(
+	        throw new UnauthorizedActionException(
 	                "Staff is not authenticated");
 	    }
 
@@ -1180,7 +1487,7 @@ public class BookingServiceImpl implements BookingService {
 	            staffRepository
 	                    .findByEmail(email)
 	                    .orElseThrow(() ->
-	                            new RuntimeException(
+	                            new ResourceNotFoundException(
 	                                    "Staff not found"));
 
 	    Integer hubId =
@@ -1197,28 +1504,41 @@ public class BookingServiceImpl implements BookingService {
 	                    Sort.by("createdAt")
 	                            .descending());
 
+	    // --------------------------------
+	    // Which end of the rental is this hub responsible for?
+	    //
+	    //   PICKUP -> bookings we hand over   (pickup_hub_id  = my hub)
+	    //   RETURN -> bookings we take back   (dropoff_hub_id = my hub)
+	    //   ALL    -> anything we touch, either end
+	    //
+	    // A one-way BOM -> Nagpur rental therefore shows in BOM's Hand-over
+	    // module and Nagpur's Return module, and in neither of the others.
+	    // --------------------------------
+
+	    HubScope effectiveScope = (scope == null) ? HubScope.ALL : scope;
+
 	    Page<BookingHeader> bookingPage;
 
-	    // --------------------------------
-	    // Optional Status Filter
-	    // --------------------------------
+	    if (effectiveScope == HubScope.PICKUP) {
 
-	    if (status != null) {
+	        bookingPage = (status != null)
+	                ? bookingHeaderRepository
+	                        .findByPickupHubIdAndBookingStatus(hubId, status, pageable)
+	                : bookingHeaderRepository
+	                        .findByPickupHubId(hubId, pageable);
 
-	        bookingPage =
-	                bookingHeaderRepository
-	                        .findByPickupHubIdAndBookingStatus(
-	                                hubId,
-	                                status,
-	                                pageable);
+	    } else if (effectiveScope == HubScope.RETURN) {
+
+	        bookingPage = (status != null)
+	                ? bookingHeaderRepository
+	                        .findByDropoffHubIdAndBookingStatus(hubId, status, pageable)
+	                : bookingHeaderRepository
+	                        .findByDropoffHubId(hubId, pageable);
 
 	    } else {
 
-	        bookingPage =
-	                bookingHeaderRepository
-	                        .findByPickupHubId(
-	                                hubId,
-	                                pageable);
+	        bookingPage = bookingHeaderRepository
+	                .findByEitherHub(hubId, status, pageable);
 	    }
 
 	    // --------------------------------
@@ -1284,7 +1604,7 @@ public class BookingServiceImpl implements BookingService {
 	            || !authentication.isAuthenticated()
 	            || "anonymousUser".equals(authentication.getPrincipal())) {
 
-	        throw new RuntimeException(
+	        throw new UnauthorizedActionException(
 	                "Staff is not authenticated");
 	    }
 
@@ -1294,7 +1614,7 @@ public class BookingServiceImpl implements BookingService {
 	            staffRepository
 	                    .findByEmail(email)
 	                    .orElseThrow(() ->
-	                            new RuntimeException(
+	                            new ResourceNotFoundException(
 	                                    "Staff not found"));
 
 	    Integer hubId =
@@ -1308,7 +1628,7 @@ public class BookingServiceImpl implements BookingService {
 	            bookingHeaderRepository
 	                    .findById(bookingId)
 	                    .orElseThrow(() ->
-	                            new RuntimeException(
+	                            new ResourceNotFoundException(
 	                                    "Booking not found"));
 
 	    // ----------------------------
@@ -1318,7 +1638,7 @@ public class BookingServiceImpl implements BookingService {
 	    if (!hubId.equals(
 	            booking.getPickupHubId())) {
 
-	        throw new RuntimeException(
+	        throw new UnauthorizedActionException(
 	                "You are not authorized to access this booking");
 	    }
 
@@ -1348,7 +1668,7 @@ public class BookingServiceImpl implements BookingService {
 	            || !authentication.isAuthenticated()
 	            || "anonymousUser".equals(authentication.getPrincipal())) {
 
-	        throw new RuntimeException(
+	        throw new UnauthorizedActionException(
 	                "Staff is not authenticated");
 	    }
 
@@ -1358,7 +1678,7 @@ public class BookingServiceImpl implements BookingService {
 	            staffRepository
 	                    .findByEmail(email)
 	                    .orElseThrow(() ->
-	                            new RuntimeException(
+	                            new ResourceNotFoundException(
 	                                    "Staff not found"));
 
 	    Integer hubId =
@@ -1378,33 +1698,32 @@ public class BookingServiceImpl implements BookingService {
 	    // Counts
 	    //-----------------------------------
 
+	    // Anything this hub touches at either end.
 	    long total =
 	            bookingHeaderRepository
-	                    .countByPickupHubId(hubId);
+	                    .countByEitherHub(hubId, null);
 
+	    // Waiting to be handed over BY US - so pickup hub.
 	    long pending =
 	            bookingHeaderRepository
 	                    .countByPickupHubIdAndBookingStatus(
 	                            hubId,
 	                            BookingStatus.PENDING);
 
+	    // Out on rent and coming back TO US - so drop-off hub.
 	    long confirmed =
 	            bookingHeaderRepository
-	                    .countByPickupHubIdAndBookingStatus(
+	                    .countByDropoffHubIdAndBookingStatus(
 	                            hubId,
 	                            BookingStatus.CONFIRMED);
 
 	    long completed =
 	            bookingHeaderRepository
-	                    .countByPickupHubIdAndBookingStatus(
-	                            hubId,
-	                            BookingStatus.COMPLETED);
+	                    .countByEitherHub(hubId, BookingStatus.COMPLETED);
 
 	    long cancelled =
 	            bookingHeaderRepository
-	                    .countByPickupHubIdAndBookingStatus(
-	                            hubId,
-	                            BookingStatus.CANCELLED);
+	                    .countByEitherHub(hubId, BookingStatus.CANCELLED);
 
 	    long todayBookings =
 	            bookingHeaderRepository
@@ -1454,7 +1773,7 @@ public class BookingServiceImpl implements BookingService {
 	            || !authentication.isAuthenticated()
 	            || "anonymousUser".equals(authentication.getPrincipal())) {
 
-	        throw new RuntimeException(
+	        throw new UnauthorizedActionException(
 	                "Staff is not authenticated");
 	    }
 
@@ -1464,7 +1783,7 @@ public class BookingServiceImpl implements BookingService {
 	            staffRepository
 	                    .findByEmail(email)
 	                    .orElseThrow(() ->
-	                            new RuntimeException(
+	                            new ResourceNotFoundException(
 	                                    "Staff not found"));
 
 	    Integer hubId =
@@ -1478,7 +1797,7 @@ public class BookingServiceImpl implements BookingService {
 	            bookingHeaderRepository
 	                    .findById(bookingId)
 	                    .orElseThrow(() ->
-	                            new RuntimeException(
+	                            new ResourceNotFoundException(
 	                                    "Booking not found"));
 
 	    //--------------------------------
@@ -1488,7 +1807,7 @@ public class BookingServiceImpl implements BookingService {
 	    if (!hubId.equals(
 	            booking.getPickupHubId())) {
 
-	        throw new RuntimeException(
+	        throw new UnauthorizedActionException(
 	                "You are not authorized to update this booking");
 	    }
 
@@ -1501,7 +1820,7 @@ public class BookingServiceImpl implements BookingService {
 
 	    if (newStatus == null) {
 
-	        throw new RuntimeException(
+	        throw new BusinessException(
 	                "Booking status is required");
 	    }
 
@@ -1512,7 +1831,7 @@ public class BookingServiceImpl implements BookingService {
 	            currentStatus,
 	            newStatus)) {
 
-	        throw new RuntimeException(
+	        throw new BusinessException(
 	                "Invalid booking status transition from "
 	                        + currentStatus
 	                        + " to "
@@ -1558,7 +1877,7 @@ public class BookingServiceImpl implements BookingService {
 	            || !authentication.isAuthenticated()
 	            || "anonymousUser".equals(authentication.getPrincipal())) {
 
-	        throw new RuntimeException(
+	        throw new UnauthorizedActionException(
 	                "Staff is not authenticated");
 	    }
 
@@ -1568,7 +1887,7 @@ public class BookingServiceImpl implements BookingService {
 	            staffRepository
 	                    .findByEmail(email)
 	                    .orElseThrow(() ->
-	                            new RuntimeException(
+	                            new ResourceNotFoundException(
 	                                    "Staff not found"));
 
 	    Integer hubId =
@@ -1582,7 +1901,7 @@ public class BookingServiceImpl implements BookingService {
 	            bookingHeaderRepository
 	                    .findById(bookingId)
 	                    .orElseThrow(() ->
-	                            new RuntimeException(
+	                            new ResourceNotFoundException(
 	                                    "Booking not found"));
 
 	    //--------------------------------
@@ -1592,7 +1911,7 @@ public class BookingServiceImpl implements BookingService {
 	    if (!hubId.equals(
 	            booking.getPickupHubId())) {
 
-	        throw new RuntimeException(
+	        throw new UnauthorizedActionException(
 	                "You are not authorized to cancel this booking");
 	    }
 
@@ -1603,14 +1922,14 @@ public class BookingServiceImpl implements BookingService {
 	    if (booking.getBookingStatus()
 	            == BookingStatus.CANCELLED) {
 
-	        throw new RuntimeException(
+	        throw new BusinessException(
 	                "Booking is already cancelled");
 	    }
 
 	    if (booking.getBookingStatus()
 	            == BookingStatus.COMPLETED) {
 
-	        throw new RuntimeException(
+	        throw new BusinessException(
 	                "Completed booking cannot be cancelled");
 	    }
 
