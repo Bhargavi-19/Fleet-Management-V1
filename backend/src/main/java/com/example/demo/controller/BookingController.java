@@ -14,7 +14,10 @@ import org.springframework.web.bind.annotation.RestController;
 import com.example.demo.dto.request.BookingRequest;
 import com.example.demo.dto.request.GuestBookingRequest;
 import com.example.demo.dto.request.UpdateBookingRequest;
+<<<<<<< HEAD
 import com.example.demo.dto.request.UpdateBookingStatusRequest;
+=======
+>>>>>>> Developer
 import com.example.demo.dto.response.BookingPageResponse;
 import com.example.demo.dto.response.BookingResponse;
 import com.example.demo.dto.response.BookingStatsResponse;
@@ -22,6 +25,11 @@ import com.example.demo.enums.BookingStatus;
 import com.example.demo.response.ApiResponse;
 import com.example.demo.service.BookingService;
 
+<<<<<<< HEAD
+=======
+import jakarta.validation.Valid;
+
+>>>>>>> Developer
 @RestController
 @RequestMapping("/api/bookings")
 public class BookingController {
@@ -34,7 +42,11 @@ public class BookingController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<BookingResponse>> createBooking(
+<<<<<<< HEAD
             @RequestBody BookingRequest request) {
+=======
+            @Valid @RequestBody BookingRequest request) {
+>>>>>>> Developer
 
         ApiResponse<BookingResponse> response =
                 bookingService.createBooking(request);
@@ -44,7 +56,11 @@ public class BookingController {
     
     @PostMapping("/guest")
     public ResponseEntity<ApiResponse<BookingResponse>> createGuestBooking(
+<<<<<<< HEAD
             @RequestBody GuestBookingRequest request) {
+=======
+            @Valid @RequestBody GuestBookingRequest request) {
+>>>>>>> Developer
 
         ApiResponse<BookingResponse> response =
                 bookingService.createGuestBooking(request);
@@ -91,7 +107,11 @@ public class BookingController {
     public ResponseEntity<ApiResponse<BookingResponse>>
             updateBooking(
                     @PathVariable Long bookingId,
+<<<<<<< HEAD
                     @RequestBody UpdateBookingRequest request) {
+=======
+                    @Valid @RequestBody UpdateBookingRequest request) {
+>>>>>>> Developer
 
         ApiResponse<BookingResponse> response =
                 bookingService.updateBooking(
@@ -123,6 +143,7 @@ public class BookingController {
 
         return ResponseEntity.ok(response);
     }
+<<<<<<< HEAD
     
     @PatchMapping("/{bookingId}/status")
     public ResponseEntity<ApiResponse<BookingResponse>>
@@ -137,6 +158,18 @@ public class BookingController {
 
         return ResponseEntity.ok(response);
     }
+=======
+
+    // NOTE: there is deliberately no customer-facing
+    // "PATCH /{bookingId}/status" endpoint.
+    //
+    // Everything under /api/bookings/** is ROLE_CUSTOMER, so such an endpoint
+    // would let a customer set their own booking to CONFIRMED or COMPLETED and
+    // skip the hand-over entirely. Status changes belong to staff:
+    //     PATCH /api/staff/bookings/{bookingId}/status
+    //
+    // Customers can still cancel through PATCH /{bookingId}/cancel above.
+>>>>>>> Developer
 }
 
 

@@ -1,5 +1,10 @@
 package com.example.demo.entity.base;
 
+<<<<<<< HEAD
+=======
+import java.time.LocalDate;
+
+>>>>>>> Developer
 import com.example.demo.enums.DocumentType;
 
 import jakarta.persistence.*;
@@ -27,6 +32,18 @@ public class Customer extends BaseEntity {
     @Column(name = "password_hash")
     private String passwordHash;
 
+<<<<<<< HEAD
+=======
+    @Column(name = "date_of_birth")
+    private LocalDate dateOfBirth;
+
+    @Column(name = "gender", length = 10)
+    private String gender;
+
+    @Column(name = "nationality", length = 50)
+    private String nationality;
+
+>>>>>>> Developer
     @Column(name = "driving_license_no")
     private String drivingLicenseNo;
 
@@ -39,12 +56,24 @@ public class Customer extends BaseEntity {
     @Column(name = "address_line_2")
     private String addressLine2;
 
+<<<<<<< HEAD
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "city_id", nullable = false)
     private City city;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "state_id", nullable = false)
+=======
+    // City / State are optional at sign-up time.
+    // The customer only supplies an address when they book or
+    // when they complete their profile, so these must be nullable.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "city_id")
+    private City city;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "state_id")
+>>>>>>> Developer
     private State state;
 
     @Column(length = 10)
@@ -137,6 +166,33 @@ public class Customer extends BaseEntity {
 		this.passwordHash = passwordHash;
 	}
 
+<<<<<<< HEAD
+=======
+	public LocalDate getDateOfBirth() {
+		return dateOfBirth;
+	}
+
+	public void setDateOfBirth(LocalDate dateOfBirth) {
+		this.dateOfBirth = dateOfBirth;
+	}
+
+	public String getGender() {
+		return gender;
+	}
+
+	public void setGender(String gender) {
+		this.gender = gender;
+	}
+
+	public String getNationality() {
+		return nationality;
+	}
+
+	public void setNationality(String nationality) {
+		this.nationality = nationality;
+	}
+
+>>>>>>> Developer
 	public String getDrivingLicenseNo() {
 		return drivingLicenseNo;
 	}

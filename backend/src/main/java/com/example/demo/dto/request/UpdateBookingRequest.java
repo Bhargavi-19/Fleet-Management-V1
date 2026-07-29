@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.math.BigDecimal;
 import java.util.List;
 
+<<<<<<< HEAD
 public class UpdateBookingRequest {
 
     private LocalDate startDate;
@@ -15,6 +16,42 @@ public class UpdateBookingRequest {
     private Integer dropoffHubId;
     private String dropoffHubName;
 
+=======
+import jakarta.validation.constraints.FutureOrPresent;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+
+public class UpdateBookingRequest {
+
+    /**
+     * The customer may switch to a different vehicle category.
+     * The rates and every amount are then recalculated on the server from
+     * this car type - the figures sent by the browser are ignored.
+     */
+    @NotNull(message = "Car type is required")
+    private Long carTypeId;
+
+    /** A booking can never start in the past. */
+    @NotNull(message = "Start date is required")
+    @FutureOrPresent(message = "The pick-up date cannot be in the past")
+    private LocalDate startDate;
+
+    @NotNull(message = "End date is required")
+    private LocalDate endDate;
+
+    @NotNull(message = "Pick-up hub is required")
+    private Integer pickupHubId;
+
+    private String pickupHubName;
+
+    @NotNull(message = "Drop-off hub is required")
+    private Integer dropoffHubId;
+
+    private String dropoffHubName;
+
+    @NotNull(message = "Duration is required")
+    @Min(value = 1, message = "Duration must be at least 1 day")
+>>>>>>> Developer
     private Integer duration;
 
     private BigDecimal vehicleAmount;
@@ -27,6 +64,17 @@ public class UpdateBookingRequest {
     public UpdateBookingRequest() {
     }
 
+<<<<<<< HEAD
+=======
+    public Long getCarTypeId() {
+        return carTypeId;
+    }
+
+    public void setCarTypeId(Long carTypeId) {
+        this.carTypeId = carTypeId;
+    }
+
+>>>>>>> Developer
     public LocalDate getStartDate() {
         return startDate;
     }

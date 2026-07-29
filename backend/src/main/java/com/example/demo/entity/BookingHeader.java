@@ -32,7 +32,14 @@ public class BookingHeader extends BaseEntity {
     @Column(name = "customer_id")
     private String customerId;
 
+<<<<<<< HEAD
     @Column(name = "car_id", nullable = false)
+=======
+    // The customer books a CAR TYPE, not a specific car.
+    // The actual vehicle is chosen by staff at handover and is stored
+    // in assignedCarId below, so this stays empty for online bookings.
+    @Column(name = "car_id")
+>>>>>>> Developer
     private Long carId;
 
     @Column(name = "start_date", nullable = false)

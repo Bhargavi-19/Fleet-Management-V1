@@ -10,6 +10,7 @@ import com.example.demo.dto.response.ProfileResponse;
 
 public interface CustomerService {
 
+<<<<<<< HEAD
     ApiResponse register(RegisterRequest request);
 
     LoginResponse login(LoginRequest request);
@@ -17,6 +18,15 @@ public interface CustomerService {
     ApiResponse<ProfileResponse> updateProfile(UpdateCustomerRequest request);
     
     ProfileResponse getProfile();
+=======
+    ApiResponse<String> register(RegisterRequest request);
+
+    ApiResponse<LoginResponse> login(LoginRequest request);
+
+    ApiResponse<ProfileResponse> updateProfile(UpdateCustomerRequest request);
+
+    ApiResponse<ProfileResponse> getProfile();
+>>>>>>> Developer
     
     ApiResponse<String> changePassword(ChangePasswordRequest request);
       

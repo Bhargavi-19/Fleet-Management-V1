@@ -21,8 +21,19 @@ public class Cors_Config {
 
         CorsConfiguration configuration = new CorsConfiguration();
 
+<<<<<<< HEAD
         configuration.setAllowedOrigins(List.of("http://localhost:5173"));
         configuration.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS"));
+=======
+        // Vite may start on 5173 or 5174 depending on what is free.
+        configuration.setAllowedOrigins(List.of(
+                "http://localhost:5173",
+                "http://localhost:5174"));
+
+        configuration.setAllowedMethods(List.of(
+                "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+
+>>>>>>> Developer
         configuration.setAllowedHeaders(List.of("*"));
 
         UrlBasedCorsConfigurationSource source =
